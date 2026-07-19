@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-bark: var(--bark);
+  --color-tree-2: var(--tree-2);
+  --color-line: var(--line);
+  --font-sans: "Rubik", system-ui, sans-serif;
+  --shadow-card: var(--shadow);
+}
+
+/* Canopy palette, extracted from the brand reference art (not invented):
+   cream + two tree greens + a single warm rope-tan accent. The tan is
+   reserved for "what's next" only (see courses' desaturated identity tints
+   in store.ts) - it never doubles as a generic decoration color. */
+/* Canopy palette, taken from the brand art: warm off-white ground, navy ink,
+   forest green for actions. Navy is the text color (as in the wordmark), green
+   is the single action color - they are not competing accents. The warm gold
+   (--accent) is reserved for one thing only: "where you are right now". */
+:root {
+  --bg: #faf8f3;
+  --surface: #ffffff;
+  --ink: #1c3b5a;
+  --muted: #7c8a84;
+  --primary: #4f8a55;
+  --primary-soft: #e8f0e4;
+  --tree-2: #7fb069;
+  --bark: #8b6b47;
+  --accent: #d6a93f;
+  --accent-soft: #f7ecd2;
+  --line: #ebe6dc;
+  --shadow: 0 1px 2px rgb(28 59 90 / 0.04), 0 8px 24px rgb(28 59 90 / 0.06);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101d1a;
+    --surface: #172723;
+    --ink: #e6eef2;
+    --muted: #93a89e;
+    --primary: #6fae72;
+    --primary-soft: #1e3329;
+    --tree-2: #6b9c5c;
+    --bark: #a5825c;
+    --accent: #d9b45b;
+    --accent-soft: #38301c;
+    --line: #22352e;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.28);
+    color-scheme: dark;
+  }
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+button { font-family: inherit; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
