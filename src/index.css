@@ -16,43 +16,40 @@
   --shadow-card: var(--shadow);
 }
 
-/* Canopy palette, extracted from the brand reference art (not invented):
-   cream + two tree greens + a single warm rope-tan accent. The tan is
-   reserved for "what's next" only (see courses' desaturated identity tints
-   in store.ts) - it never doubles as a generic decoration color. */
-/* Canopy palette, taken from the brand art: warm off-white ground, navy ink,
-   forest green for actions. Navy is the text color (as in the wordmark), green
-   is the single action color - they are not competing accents. The warm gold
-   (--accent) is reserved for one thing only: "where you are right now". */
+/* Canopy palette v2, taken from the brand art: warm yellow-tinted cream
+   ground, navy ink (as in the wordmark), and the grove's fresh yellow-greens.
+   Navy is text, olive-green is the single action color - not competing
+   accents. The warm gold (--accent) is reserved for one thing only:
+   "where you are right now". */
 :root {
-  --bg: #faf8f3;
+  --bg: #f8f6e8;
   --surface: #ffffff;
-  --ink: #1c3b5a;
-  --muted: #7c8a84;
-  --primary: #4f8a55;
-  --primary-soft: #e8f0e4;
-  --tree-2: #7fb069;
-  --bark: #8b6b47;
+  --ink: #2e3a59;
+  --muted: #7e8672;
+  --primary: #62862f;
+  --primary-soft: #eef2d6;
+  --tree-2: #a9c25d;
+  --bark: #96754a;
   --accent: #d6a93f;
   --accent-soft: #f7ecd2;
-  --line: #ebe6dc;
-  --shadow: 0 1px 2px rgb(28 59 90 / 0.04), 0 8px 24px rgb(28 59 90 / 0.06);
+  --line: #e8e4cf;
+  --shadow: 0 1px 2px rgb(46 58 89 / 0.04), 0 8px 24px rgb(46 58 89 / 0.06);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #101d1a;
-    --surface: #172723;
-    --ink: #e6eef2;
-    --muted: #93a89e;
-    --primary: #6fae72;
-    --primary-soft: #1e3329;
-    --tree-2: #6b9c5c;
+    --bg: #14180f;
+    --surface: #1d2314;
+    --ink: #ecefe0;
+    --muted: #98a184;
+    --primary: #86a03f;
+    --primary-soft: #2b3418;
+    --tree-2: #667e35;
     --bark: #a5825c;
     --accent: #d9b45b;
-    --accent-soft: #38301c;
-    --line: #22352e;
+    --accent-soft: #383018;
+    --line: #2b311e;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.28);
     color-scheme: dark;
   }

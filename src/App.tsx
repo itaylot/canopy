@@ -36,12 +36,20 @@ function MainApp({ user }: { user: FirebaseUser }) {
     <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg md:max-w-2xl lg:grid lg:max-w-7xl lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-6">
       {/* Desktop sidebar - first grid column, which in RTL is the right side */}
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:py-6">
-        <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-surface shadow-card">
-          <div className="flex items-center gap-2 px-5 pb-2 pt-6 text-lg font-bold tracking-wide text-ink">
+        <div className="relative flex flex-1 flex-col overflow-hidden rounded-3xl bg-surface shadow-card">
+          {/* full-height grove art: empty sky up top carries the nav, trees at the bottom */}
+          <img
+            src="/sidebar-bg.png"
+            alt=""
+            onError={(e) => (e.currentTarget.style.display = 'none')}
+            className="absolute inset-0 h-full w-full object-cover object-bottom dark:hidden"
+          />
+
+          <div className="relative flex items-center gap-2 px-5 pb-2 pt-6 text-lg font-bold tracking-wide text-ink">
             <CanopyMark size={30} /> CANOPY
           </div>
 
-          <nav className="mt-4 flex flex-col gap-1 px-3">
+          <nav className="relative mt-4 flex flex-col gap-1 px-3">
             {TABS.map(({ key, label, Icon }) => {
               const on = key === tab
               return (
@@ -50,7 +58,7 @@ function MainApp({ user }: { user: FirebaseUser }) {
                   onClick={() => setTab(key)}
                   aria-current={on ? 'page' : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-semibold transition-colors ${
-                    on ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-bg hover:text-ink'
+                    on ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface/70 hover:text-ink'
                   }`}
                 >
                   <Icon weight={on ? 'fill' : 'regular'} size={20} />
@@ -59,11 +67,6 @@ function MainApp({ user }: { user: FirebaseUser }) {
               )
             })}
           </nav>
-
-          {/* decorative grove at the bottom, reusing the hero illustration */}
-          <div className="mt-auto h-44 overflow-hidden">
-            <img src="/canopy-hero-min.png" alt="" className="h-full w-full object-cover object-bottom" />
-          </div>
         </div>
       </aside>
 
