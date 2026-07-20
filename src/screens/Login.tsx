@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { motion } from 'motion/react'
 import { GoogleLogo } from '@phosphor-icons/react'
 import { signIn } from '../firebase'
-import { CanopyMark } from '../ui'
 
 export default function Login() {
   const [busy, setBusy] = useState(false)
@@ -22,14 +21,14 @@ export default function Login() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-primary-soft to-bg px-6 text-center">
-      <motion.div
-        initial={{ scale: 0, y: 8 }}
-        animate={{ scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 240, damping: 16 }}
-        className="grid h-24 w-24 place-items-center rounded-3xl bg-surface shadow-card"
-      >
-        <CanopyMark size={56} />
-      </motion.div>
+      <motion.img
+        src="/canopy-hero-min.png"
+        alt="איור של רוכב אומגה גולש על חבל בין שני עצים"
+        initial={{ scale: 0.94, y: 8, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+        className="w-full max-w-xs rounded-3xl shadow-card"
+      />
 
       <h1 className="mt-6 text-3xl font-bold text-ink">Canopy</h1>
       <p className="mt-2 max-w-xs text-muted">

@@ -52,13 +52,12 @@ export default function Home() {
       </header>
 
       <Card className="overflow-hidden">
-        <div className="bg-primary-soft/40 px-2 pt-2">
-          <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
-        </div>
+        {/* the illustration's own cream sky is the card surface, like the mockup */}
+        <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
         <p className="px-4 py-3 text-center text-sm text-muted">
           {tasks.length === 0
             ? 'הוסף משימות כדי למתוח את המסלול.'
-            : 'כל משימה שהשלמת מאריכה את המסלול.'}
+            : 'השלם משימות כדי להאריך את המסלול.'}
         </p>
       </Card>
 
