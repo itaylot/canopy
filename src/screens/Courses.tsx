@@ -54,7 +54,7 @@ export default function Courses() {
         </Card>
       )}
 
-      <div className="space-y-3">
+      <div className="grid gap-3 lg:grid-cols-2">
         {courses.map((c) => {
           const { total, done, minutesLeft, exam } = statFor(c.id)
           const pct = total ? (done / total) * 100 : 0

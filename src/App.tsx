@@ -32,7 +32,7 @@ function MainApp() {
   const active = TABS.find((t) => t.key === tab)!
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg md:max-w-2xl lg:max-w-3xl">
+    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg md:max-w-2xl lg:max-w-5xl xl:max-w-6xl">
       <header className="flex items-center justify-between px-4 pt-4">
         <span className="flex items-center gap-2 text-lg font-bold tracking-wide text-ink">
           <CanopyMark size={26} /> CANOPY
@@ -48,7 +48,7 @@ function MainApp() {
         </motion.div>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:max-w-2xl lg:max-w-3xl">
+      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:max-w-2xl lg:max-w-xl">
         <div className="grid grid-cols-4 rounded-2xl bg-surface/95 p-1.5 shadow-card backdrop-blur-lg">
           {TABS.map(({ key, label, Icon }) => {
             const on = key === tab

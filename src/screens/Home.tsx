@@ -38,11 +38,14 @@ export default function Home() {
   const firstName = (auth.currentUser?.displayName ?? '').split(' ')[0]
 
   return (
-    <div className="space-y-5">
+    // Single-column on mobile; on desktop the dashboard spreads into a main
+    // column plus a sticky side rail (exams + focus timer). One breakpoint.
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start lg:gap-6">
       <LeafBurst show={burst} />
 
+      <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-bold text-ink">
+        <h1 className="text-2xl font-bold text-ink lg:text-3xl">
           {greetingHe()}
           {firstName ? `, ${firstName}` : ''}
         </h1>
@@ -109,8 +112,9 @@ export default function Home() {
           )}
         </div>
       </section>
+      </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:sticky lg:top-6 lg:mt-0 lg:grid-cols-1">
         <Card className="p-4">
           <h2 className="mb-3 font-bold text-ink">מבחנים קרובים</h2>
           {upcomingExams.length === 0 ? (
