@@ -16,41 +16,44 @@
   --shadow-card: var(--shadow);
 }
 
-/* Canopy palette v2, taken from the brand art: warm yellow-tinted cream
-   ground, navy ink (as in the wordmark), and the grove's fresh yellow-greens.
-   Navy is text, olive-green is the single action color - not competing
-   accents. The warm gold (--accent) is reserved for one thing only:
-   "where you are right now". */
+/* Canopy palette v3 - the user's locked 10-color scheme:
+   Porcelain #FDFDF9 (surface) · Prussian Blue #042544 (ink) · Fern #4C7B39
+   (actions) · Lime Moss #B5B938 / #88A431 (foliage) · Olive Bark #714F21 ·
+   Olive Wood #815623 · Golden Earth #8A5D1F · Dark Goldenrod #B88A3E ·
+   Camel #CA9D59. Soft/line/bg values are light tints of these, nothing else.
+   The goldenrod --accent stays reserved for "where you are right now". */
 :root {
-  --bg: #f8f6e8;
-  --surface: #ffffff;
-  --ink: #2e3a59;
-  --muted: #7e8672;
-  --primary: #62862f;
-  --primary-soft: #eef2d6;
-  --tree-2: #a9c25d;
-  --bark: #96754a;
-  --accent: #d6a93f;
-  --accent-soft: #f7ecd2;
-  --line: #e8e4cf;
-  --shadow: 0 1px 2px rgb(46 58 89 / 0.04), 0 8px 24px rgb(46 58 89 / 0.06);
+  --bg: #f7f6ec;
+  --surface: #fdfdf9;
+  --ink: #042544;
+  --muted: #6f7566;
+  --primary: #4c7b39;
+  --primary-soft: #e9f0de;
+  --tree-2: #88a431;
+  --bark: #714f21;
+  --accent: #b88a3e;
+  --accent-soft: #f4e8cf;
+  --line: #e8e6d6;
+  --shadow: 0 1px 2px rgb(4 37 68 / 0.04), 0 8px 24px rgb(4 37 68 / 0.06);
   color-scheme: light;
 }
 
+/* Dark mode lives on Prussian Blue depths; Lime Moss carries the actions,
+   Camel carries the warmth. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14180f;
-    --surface: #1d2314;
-    --ink: #ecefe0;
-    --muted: #98a184;
-    --primary: #86a03f;
-    --primary-soft: #2b3418;
-    --tree-2: #667e35;
-    --bark: #a5825c;
-    --accent: #d9b45b;
-    --accent-soft: #383018;
-    --line: #2b311e;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 8px 24px rgb(0 0 0 / 0.28);
+    --bg: #061829;
+    --surface: #0c2338;
+    --ink: #f1f3ea;
+    --muted: #8fa0ac;
+    --primary: #88a431;
+    --primary-soft: #1c3524;
+    --tree-2: #4c7b39;
+    --bark: #ca9d59;
+    --accent: #ca9d59;
+    --accent-soft: #3b2f16;
+    --line: #1d3550;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 8px 24px rgb(0 0 0 / 0.35);
     color-scheme: dark;
   }
 }

@@ -51,7 +51,7 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
       <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full">
         <path
           d={`M ${A.x} ${A.y} Q ${C.x} ${C.y} ${B.x} ${B.y}`}
-          stroke="#8c6a43"
+          stroke="#a07b3f"
           strokeWidth="7"
           fill="none"
           strokeLinecap="round"
@@ -70,8 +70,8 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
                 cx={n.x}
                 cy={n.y}
                 r={n.state === 'done' ? 34 : 30}
-                fill={n.state === 'done' ? 'var(--primary)' : '#fffefa'}
-                stroke={n.state === 'done' ? 'none' : '#d8d2c2'}
+                fill={n.state === 'done' ? '#4c7b39' : '#fdfdf9'}
+                stroke={n.state === 'done' ? 'none' : '#d9d5c0'}
                 strokeWidth="3"
                 strokeDasharray={n.state === 'todo' ? '8 8' : undefined}
               />

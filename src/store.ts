@@ -13,10 +13,10 @@ export type Task = {
 }
 export type Exam = { id: string; courseId: string; title: string; date: string }
 
-// Muted, desaturated tones only - just enough to tell courses apart. The one
-// saturated color in the whole app (--accent, warm tan) stays reserved for
-// "what's next", never reused here as a course identity color.
-export const COURSE_COLORS = ['#5C7A5F', '#8C6A43', '#A6874F', '#6B7F8C', '#8A6E7A', '#7A8C6E']
+// Course identity colors drawn from the locked brand palette (Fern, Olive
+// Bark, Golden Earth, Camel, Lime Moss 2, lightened Prussian). The goldenrod
+// --accent stays reserved for "what's next", never a course identity.
+export const COURSE_COLORS = ['#4C7B39', '#714F21', '#8A5D1F', '#CA9D59', '#88A431', '#2E4A68']
 export const COURSE_EMOJIS = ['📐', '🧠', '📖', '⚗️', '💻', '🎨', '🧬', '📊', '🗺️', '🎵']
 
 type State = {
