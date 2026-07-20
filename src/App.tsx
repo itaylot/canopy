@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { House, CalendarBlank, BookOpen, User, CaretDown } from '@phosphor-icons/react'
+import { House, CalendarBlank, BookOpen, User } from '@phosphor-icons/react'
 import type { User as FirebaseUser } from 'firebase/auth'
 import Home from './screens/Home'
 import CalendarScreen from './screens/CalendarScreen'
@@ -35,21 +35,13 @@ function MainApp({ user }: { user: FirebaseUser }) {
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg md:max-w-2xl lg:grid lg:max-w-7xl lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-6">
       {/* Desktop sidebar - first grid column, which in RTL is the right side */}
-      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:py-6">
-        <div className="relative flex flex-1 flex-col overflow-hidden rounded-3xl bg-surface shadow-card">
-          {/* full-height grove art: empty sky up top carries the nav, trees at the bottom */}
-          <img
-            src="/sidebar-bg.png"
-            alt=""
-            onError={(e) => (e.currentTarget.style.display = 'none')}
-            className="absolute inset-0 h-full w-full object-cover object-bottom dark:hidden"
-          />
-
-          <div className="relative flex items-center gap-2 px-5 pb-2 pt-6 text-lg font-bold tracking-wide text-ink">
+      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:py-6">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-surface bg-[url('/sidebar-bg.png')] bg-cover bg-bottom shadow-card dark:bg-none">
+          <div className="flex items-center gap-2 px-5 pb-2 pt-6 text-lg font-bold tracking-wide text-ink">
             <CanopyMark size={30} /> CANOPY
           </div>
 
-          <nav className="relative mt-4 flex flex-col gap-1 px-3">
+          <nav className="mt-4 flex flex-col gap-1 px-3">
             {TABS.map(({ key, label, Icon }) => {
               const on = key === tab
               return (
@@ -67,6 +59,24 @@ function MainApp({ user }: { user: FirebaseUser }) {
               )
             })}
           </nav>
+
+          {/* signed-in user, inside the menu (frees the whole top strip of the page) */}
+          <button
+            onClick={() => setTab('profile')}
+            className="mx-3 mt-3 flex items-center gap-2.5 rounded-xl border-t border-line/60 bg-surface/80 px-3 py-3 text-right backdrop-blur-sm transition-colors hover:bg-surface"
+          >
+            {user.photoURL ? (
+              <img src={user.photoURL} alt="" className="h-8 w-8 shrink-0 rounded-full" />
+            ) : (
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary">
+                {(user.displayName ?? user.email ?? '?').slice(0, 1)}
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-ink">{user.displayName ?? 'משתמש'}</span>
+              <span className="block truncate text-[11px] text-muted">{user.email}</span>
+            </span>
+          </button>
         </div>
       </aside>
 
@@ -77,24 +87,6 @@ function MainApp({ user }: { user: FirebaseUser }) {
             <CanopyMark size={26} /> CANOPY
           </span>
         </header>
-
-        {/* Desktop top bar: profile chip at the inline start (right in RTL) */}
-        <div className="hidden lg:mb-5 lg:flex lg:items-center">
-          <button
-            onClick={() => setTab('profile')}
-            className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-2.5 shadow-card transition-shadow hover:shadow-lg"
-          >
-            {user.photoURL ? (
-              <img src={user.photoURL} alt="" className="h-9 w-9 rounded-full" />
-            ) : (
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary-soft font-semibold text-primary">
-                {(user.displayName ?? user.email ?? '?').slice(0, 1)}
-              </span>
-            )}
-            <span className="text-sm font-semibold text-ink">{user.displayName ?? user.email}</span>
-            <CaretDown size={14} className="text-muted" />
-          </button>
-        </div>
 
         <main className="flex-1 px-4 pb-32 pt-4 lg:p-0">
           {/* Screen swap is instant (never gated on an animation); a transform-only
