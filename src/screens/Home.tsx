@@ -1,9 +1,27 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Timer, Play, Pause, ArrowCounterClockwise, CheckCircle } from '@phosphor-icons/react'
+import {
+  Timer,
+  Play,
+  Pause,
+  ArrowCounterClockwise,
+  CheckCircle,
+  Leaf,
+  BookOpen,
+  CalendarCheck,
+} from '@phosphor-icons/react'
 import { useStore } from '../store'
 import { buildSchedule } from '../schedule'
-import { todayIso, relativeDaysHe, monthShortHe, dayOfMonth } from '../utils'
+import {
+  todayIso,
+  toIso,
+  relativeDaysHe,
+  monthShortHe,
+  dayOfMonth,
+  startOfWeekIso,
+  formatDuration,
+  monthLabel,
+} from '../utils'
 import { TaskRow, LeafBurst, Card } from '../ui'
 import { CanopyScene } from '../CanopyScene'
 import { auth } from '../firebase'
@@ -38,83 +56,83 @@ export default function Home() {
   const firstName = (auth.currentUser?.displayName ?? '').split(' ')[0]
 
   return (
-    // Single-column on mobile; on desktop the dashboard spreads into a main
-    // column plus a sticky side rail (exams + focus timer). One breakpoint.
-    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start lg:gap-6">
+    <div className="space-y-5">
       <LeafBurst show={burst} />
 
-      <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-bold text-ink lg:text-3xl">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-ink lg:text-3xl">
           {greetingHe()}
           {firstName ? `, ${firstName}` : ''}
+          <Leaf weight="fill" size={22} className="shrink-0 -scale-x-100 text-primary" />
         </h1>
         <p className="mt-0.5 text-sm text-muted">
           {total === 0 ? 'אין משימות מתוכננות להיום.' : allDone ? 'סיימת את הכול להיום.' : 'בוא נשמור על המומנטום.'}
         </p>
       </header>
 
-      <Card className="overflow-hidden">
-        {/* the illustration's own cream sky is the card surface, like the mockup */}
-        <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
-        <p className="px-4 py-3 text-center text-sm text-muted">
-          {tasks.length === 0
-            ? 'הוסף משימות כדי למתוח את המסלול.'
-            : 'השלם משימות כדי להאריך את המסלול.'}
-        </p>
-      </Card>
+      {/* Row 1: the scene next to today's tasks, like the mockup. In RTL the
+          first column (the scene, the star of the screen) sits on the right. */}
+      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-5 lg:space-y-0">
+        <Card className="overflow-hidden">
+          {/* the illustration's own cream sky is the card surface */}
+          <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
+          <p className="px-4 py-3 text-center text-sm text-muted">
+            {tasks.length === 0
+              ? 'הוסף משימות כדי למתוח את המסלול.'
+              : 'השלם משימות כדי להאריך את המסלול.'}
+          </p>
+        </Card>
 
-      <section>
-        <div className="mb-2.5 flex items-baseline justify-between">
-          <h2 className="font-bold text-ink">משימות היום</h2>
-          {total > 0 && (
-            <span className="text-sm text-muted">
-              {doneToday.length} מתוך {total}
-            </span>
-          )}
-        </div>
+        <Card className="p-4">
+          <div className="mb-1 flex items-baseline justify-between">
+            <h2 className="font-bold text-ink">המשימות להיום</h2>
+            {total > 0 && (
+              <span className="text-sm text-muted">
+                {doneToday.length} מתוך {total}
+              </span>
+            )}
+          </div>
 
-        <div className="space-y-2.5">
-          <AnimatePresence mode="popLayout">
-            {pendingToday.map((t) => (
-              <TaskRow key={t.id} task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
-            ))}
-          </AnimatePresence>
+          <div className="divide-y divide-line/70">
+            <AnimatePresence mode="popLayout">
+              {pendingToday.map((t) => (
+                <TaskRow key={t.id} flat task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
+              ))}
+            </AnimatePresence>
 
-          {allDone && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="rounded-2xl bg-primary-soft px-4 py-6 text-center"
-            >
-              <CheckCircle weight="fill" size={32} className="mx-auto text-primary" />
-              <p className="mt-2 font-semibold text-ink">סיימת את כל המשימות של היום.</p>
-              <p className="text-sm text-muted">המסלול שלך התקדם ב-{doneToday.length}.</p>
-            </motion.div>
-          )}
+            {allDone && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="rounded-2xl bg-primary-soft px-4 py-6 text-center"
+              >
+                <CheckCircle weight="fill" size={32} className="mx-auto text-primary" />
+                <p className="mt-2 font-semibold text-ink">סיימת את כל המשימות של היום.</p>
+                <p className="text-sm text-muted">המסלול שלך התקדם ב-{doneToday.length}.</p>
+              </motion.div>
+            )}
 
-          {total === 0 && (
-            <div className="rounded-2xl border border-dashed border-line px-4 py-10 text-center">
-              <p className="text-ink">אין משימות מתוכננות להיום.</p>
-              <p className="mt-1 text-sm text-muted">הוסף משימות בטאב הקורסים והן ישובצו לכאן.</p>
-            </div>
-          )}
+            {total === 0 && (
+              <div className="px-4 py-8 text-center">
+                <p className="text-ink">אין משימות מתוכננות להיום.</p>
+                <p className="mt-1 text-sm text-muted">הוסף משימות בטאב הקורסים והן ישובצו לכאן.</p>
+              </div>
+            )}
 
-          {doneToday.length > 0 && pendingToday.length > 0 && (
-            <div className="pt-2">
-              <p className="mb-2 text-xs font-medium text-muted">הושלמו היום</p>
-              <div className="space-y-2.5">
+            {doneToday.length > 0 && pendingToday.length > 0 && (
+              <div className="pt-2">
+                <p className="pt-2 text-xs font-medium text-muted">הושלמו היום</p>
                 {doneToday.map((t) => (
-                  <TaskRow key={t.id} task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
+                  <TaskRow key={t.id} flat task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      </section>
+            )}
+          </div>
+        </Card>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:sticky lg:top-6 lg:mt-0 lg:grid-cols-1">
+      {/* Row 2: supporting cards */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="p-4">
           <h2 className="mb-3 font-bold text-ink">מבחנים קרובים</h2>
           {upcomingExams.length === 0 ? (
@@ -139,7 +157,11 @@ export default function Home() {
           )}
         </Card>
 
+        <WeeklySummary />
+
         <FocusTimer />
+
+        <MiniMonth schedule={schedule} today={today} />
       </div>
     </div>
   )
@@ -152,6 +174,104 @@ function greetingHe() {
   if (h < 17) return 'צהריים טובים'
   if (h < 21) return 'ערב טוב'
   return 'לילה טוב'
+}
+
+/** Honest weekly numbers only: hours studied, tasks finished, active days.
+ *  Deliberately no streaks and no invented goal percentages. */
+function WeeklySummary() {
+  const { tasks } = useStore()
+  const today = todayIso()
+  const weekStart = startOfWeekIso(today)
+
+  const doneThisWeek = tasks.filter((t) => t.done && t.completedAt && t.completedAt >= weekStart)
+  const minutes = doneThisWeek.reduce((s, t) => s + t.minutes, 0)
+  const activeDays = new Set(doneThisWeek.map((t) => t.completedAt)).size
+
+  const rows = [
+    { Icon: BookOpen, value: minutes > 0 ? formatDuration(minutes) : '0', label: 'זמן למידה השבוע' },
+    { Icon: CheckCircle, value: String(doneThisWeek.length), label: 'משימות הושלמו' },
+    { Icon: CalendarCheck, value: String(activeDays), label: 'ימים פעילים' },
+  ]
+
+  return (
+    <Card className="p-4">
+      <h2 className="mb-3 font-bold text-ink">סיכום שבועי</h2>
+      <ul className="space-y-3">
+        {rows.map(({ Icon, value, label }) => (
+          <li key={label} className="flex items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-soft">
+              <Icon size={20} className="text-accent" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-lg font-bold tabular-nums leading-tight text-ink">{value}</span>
+              <span className="block truncate text-xs text-muted">{label}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+const WEEKDAY_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
+
+/** Read-only mini month: today highlighted, dots for days that carry exams or
+ *  scheduled tasks. The full calendar lives in its own tab. Desktop-only. */
+function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; today: string }) {
+  const { exams } = useStore()
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+
+  const examDays = useMemo(() => new Set(exams.map((e) => e.date)), [exams])
+  const cells = useMemo(() => {
+    const first = new Date(year, month, 1)
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const out: (string | null)[] = []
+    for (let i = 0; i < first.getDay(); i++) out.push(null)
+    for (let d = 1; d <= daysInMonth; d++) out.push(toIso(new Date(year, month, d)))
+    return out
+  }, [year, month])
+
+  return (
+    <Card className="hidden p-4 lg:block">
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="font-bold text-ink">לוח זמנים</h2>
+        <span className="text-xs text-muted">{monthLabel(year, month)}</span>
+      </div>
+
+      <div className="grid grid-cols-7 text-center text-[10px] text-muted">
+        {WEEKDAY_LETTERS.map((w) => (
+          <div key={w} className="py-0.5">
+            {w}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-y-0.5 text-center text-xs">
+        {cells.map((iso, i) => {
+          if (!iso) return <div key={i} />
+          const isToday = iso === today
+          const hasExam = examDays.has(iso)
+          const hasTasks = (schedule[iso]?.length ?? 0) > 0
+          return (
+            <div key={iso} className="relative py-1">
+              <span
+                className={`mx-auto grid h-6 w-6 place-items-center rounded-full tabular-nums ${
+                  isToday ? 'bg-primary font-bold text-white' : 'text-ink'
+                }`}
+              >
+                {dayOfMonth(iso)}
+              </span>
+              <span className="absolute inset-x-0 -bottom-0.5 flex justify-center gap-0.5">
+                {hasExam && <span className="h-1 w-1 rounded-full bg-accent" />}
+                {hasTasks && !isToday && <span className="h-1 w-1 rounded-full bg-primary" />}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </Card>
+  )
 }
 
 const FOCUS_MINUTES = 25

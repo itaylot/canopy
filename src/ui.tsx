@@ -94,11 +94,14 @@ export function TaskRow({
   course,
   onToggle,
   onDelete,
+  flat = false,
 }: {
   task: Task
   course?: Course
   onToggle: () => void
   onDelete?: () => void
+  /** Renders as a plain row (for lists inside one Card with dividers) instead of a standalone card. */
+  flat?: boolean
 }) {
   return (
     <motion.div
@@ -106,7 +109,11 @@ export function TaskRow({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-      className="flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-lg"
+      className={
+        flat
+          ? 'flex items-center gap-3 px-1 py-3'
+          : 'flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-lg'
+      }
     >
       <span
         aria-hidden
