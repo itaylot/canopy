@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Plus, Trash } from '@phosphor-icons/react'
 import { useStore, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
@@ -7,15 +7,17 @@ import {
   formatHeShort,
   formatDuration,
   relativeDaysHe,
+  examLabel,
   DURATION_OPTIONS_MIN,
 } from '../utils'
-import { Sheet, TaskRow, Field, inputClass, PrimaryButton, Card } from '../ui'
+import { Sheet, TaskRow, Field, inputClass, PrimaryButton, Card, RowMenu } from '../ui'
 
 export default function Courses() {
-  const { courses, tasks, exams, addCourse } = useStore()
+  const { courses, tasks, exams, addCourse, updateCourse, removeCourse } = useStore()
   const today = todayIso()
   const [open, setOpen] = useState<Course | null>(null)
   const [adding, setAdding] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null)
 
   const statFor = (courseId: string) => {
     const list = tasks.filter((t) => t.courseId === courseId)
@@ -59,32 +61,35 @@ export default function Courses() {
           const { total, done, minutesLeft, exam } = statFor(c.id)
           const pct = total ? (done / total) * 100 : 0
           return (
-            <motion.button
+            <motion.div
               key={c.id}
               layout
-              whileTap={{ scale: 0.985 }}
-              onClick={() => setOpen(c)}
               className="w-full overflow-hidden rounded-2xl bg-surface text-right shadow-card transition-shadow hover:shadow-lg"
             >
+              {/* The card is a div, not a button: the overflow menu is itself a
+                  button and nesting buttons is invalid HTML (and breaks clicks). */}
               <div className="flex items-center gap-3 p-4">
-                <span
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-xl"
-                  style={{ backgroundColor: c.color + '1f' }}
-                >
-                  {c.emoji}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold text-ink">{c.name}</div>
-                  <div className="truncate text-xs text-muted">
-                    {done} מתוך {total} משימות
-                    {minutesLeft > 0 ? ` · נותרו ${formatDuration(minutesLeft)}` : ''}
-                  </div>
-                </div>
+                <button onClick={() => setOpen(c)} className="flex min-w-0 flex-1 items-center gap-3 text-right">
+                  <span
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-xl"
+                    style={{ backgroundColor: c.color + '1f' }}
+                  >
+                    {c.emoji}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-ink">{c.name}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {done} מתוך {total} משימות
+                      {minutesLeft > 0 ? ` · נותרו ${formatDuration(minutesLeft)}` : ''}
+                    </span>
+                  </span>
+                </button>
                 {exam && (
                   <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-medium text-ink">
                     {relativeDaysHe(today, exam.date)}
                   </span>
                 )}
+                <RowMenu onEdit={() => setEditingCourse(c)} onDelete={() => removeCourse(c.id)} />
               </div>
               <div className="h-1.5 w-full bg-line/60">
                 <motion.div
@@ -95,7 +100,7 @@ export default function Courses() {
                   style={{ backgroundColor: c.color }}
                 />
               </div>
-            </motion.button>
+            </motion.div>
           )
         })}
 
@@ -108,7 +113,13 @@ export default function Courses() {
       </div>
 
       <CourseDetail course={open} onClose={() => setOpen(null)} />
-      <AddCourse open={adding} onClose={() => setAdding(false)} onAdd={addCourse} />
+      <CourseForm open={adding} onClose={() => setAdding(false)} onSubmit={addCourse} />
+      <CourseForm
+        open={!!editingCourse}
+        editing={editingCourse}
+        onClose={() => setEditingCourse(null)}
+        onSubmit={(c) => editingCourse && updateCourse(editingCourse.id, c)}
+      />
     </div>
   )
 }
@@ -123,10 +134,13 @@ function Summary({ value, label }: { value: string; label: string }) {
 }
 
 function CourseDetail({ course, onClose }: { course: Course | null; onClose: () => void }) {
-  const { tasks, exams, toggleTask, removeTask, addTask, removeCourse } = useStore()
+  const { tasks, exams, toggleTask, removeTask, addTask, updateTask, removeCourse } = useStore()
   const [title, setTitle] = useState('')
   const [minutes, setMinutes] = useState(60)
   const [dueDate, setDueDate] = useState('')
+  // Editing reuses the same inline form rather than opening a second sheet on
+  // top of this one — nested bottom sheets are awkward to dismiss on mobile.
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const list = useMemo(
     () => (course ? tasks.filter((t) => t.courseId === course.id) : []),
@@ -136,12 +150,28 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
     ? exams.filter((e) => e.courseId === course.id).sort((a, b) => (a.date < b.date ? -1 : 1))[0]
     : undefined
 
-  const submit = () => {
-    if (!course || !title.trim()) return
-    addTask({ courseId: course.id, title: title.trim(), minutes, dueDate: dueDate || undefined })
+  const reset = () => {
+    setEditingId(null)
     setTitle('')
     setDueDate('')
     setMinutes(60)
+  }
+
+  const startEdit = (id: string) => {
+    const t = list.find((x) => x.id === id)
+    if (!t) return
+    setEditingId(id)
+    setTitle(t.title)
+    setMinutes(t.minutes)
+    setDueDate(t.dueDate ?? '')
+  }
+
+  const submit = () => {
+    if (!course || !title.trim()) return
+    const fields = { title: title.trim(), minutes, dueDate: dueDate || undefined }
+    if (editingId) updateTask(editingId, fields)
+    else addTask({ courseId: course.id, ...fields })
+    reset()
   }
 
   return (
@@ -150,7 +180,7 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
         <div className="space-y-4">
           {exam && (
             <div className="rounded-xl bg-accent-soft px-4 py-2.5 text-sm text-ink">
-              📌 {exam.title} · {formatHeShort(exam.date)}
+              📌 {examLabel(exam.title, course.name)} · {formatHeShort(exam.date)}
             </div>
           )}
 
@@ -161,15 +191,19 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
                   key={t.id}
                   task={t}
                   onToggle={() => toggleTask(t.id)}
-                  onDelete={() => removeTask(t.id)}
+                  onEdit={() => startEdit(t.id)}
+                  onDelete={() => {
+                    if (editingId === t.id) reset()
+                    removeTask(t.id)
+                  }}
                 />
               ))}
             </AnimatePresence>
             {list.length === 0 && <p className="py-4 text-center text-sm text-muted">אין משימות עדיין.</p>}
           </div>
 
-          <div className="rounded-2xl border border-line p-3">
-            <Field label="משימה חדשה">
+          <div className={`rounded-2xl border p-3 ${editingId ? 'border-primary bg-primary-soft/30' : 'border-line'}`}>
+            <Field label={editingId ? 'עריכת משימה' : 'משימה חדשה'}>
               <input
                 className={inputClass}
                 value={title}
@@ -205,7 +239,12 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
                 ? 'המשימה תופיע ביום שבחרת.'
                 : 'בלי יום נבחר, המשימה תשובץ אוטומטית לפני המבחן הקרוב.'}
             </p>
-            <PrimaryButton onClick={submit}>הוסף משימה</PrimaryButton>
+            <PrimaryButton onClick={submit}>{editingId ? 'שמור שינויים' : 'הוסף משימה'}</PrimaryButton>
+            {editingId && (
+              <button onClick={reset} className="mt-2 w-full py-1.5 text-sm text-muted transition-colors hover:text-ink">
+                ביטול
+              </button>
+            )}
           </div>
 
           <button
@@ -223,30 +262,54 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
   )
 }
 
-function AddCourse({
+/** One form, two modes. `editing` present ⇒ prefilled and saves changes;
+ *  absent ⇒ blank and creates. The Sheet stays mounted so it keeps its exit
+ *  animation; only the body remounts (via the key) so every open starts from
+ *  fresh initial state instead of whatever was typed last time. */
+function CourseForm({
   open,
   onClose,
-  onAdd,
+  onSubmit,
+  editing,
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (c: Omit<Course, 'id'>) => void
+  onSubmit: (c: Omit<Course, 'id'>) => void
+  editing?: Course | null
 }) {
-  const [name, setName] = useState('')
-  const [emoji, setEmoji] = useState(COURSE_EMOJIS[0])
-  const [color, setColor] = useState(COURSE_COLORS[0])
+  const [nonce, setNonce] = useState(0)
+  useEffect(() => {
+    if (open) setNonce((n) => n + 1)
+  }, [open])
+
+  return (
+    <Sheet open={open} onClose={onClose} title={editing ? 'עריכת קורס' : 'קורס חדש'}>
+      <CourseFormBody key={`${editing?.id ?? 'new'}-${nonce}`} onClose={onClose} onSubmit={onSubmit} editing={editing} />
+    </Sheet>
+  )
+}
+
+function CourseFormBody({
+  onClose,
+  onSubmit,
+  editing,
+}: {
+  onClose: () => void
+  onSubmit: (c: Omit<Course, 'id'>) => void
+  editing?: Course | null
+}) {
+  const [name, setName] = useState(editing?.name ?? '')
+  const [emoji, setEmoji] = useState(editing?.emoji ?? COURSE_EMOJIS[0])
+  const [color, setColor] = useState(editing?.color ?? COURSE_COLORS[0])
 
   const submit = () => {
     if (!name.trim()) return
-    onAdd({ name: name.trim(), emoji, color })
-    setName('')
-    setEmoji(COURSE_EMOJIS[0])
-    setColor(COURSE_COLORS[0])
+    onSubmit({ name: name.trim(), emoji, color })
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="קורס חדש">
+    <>
       <Field label="שם הקורס">
         <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="למשל: חשבון אינפיניטסימלי" />
       </Field>
@@ -280,8 +343,8 @@ function AddCourse({
         </div>
       </Field>
       <div className="mt-2">
-        <PrimaryButton onClick={submit}>הוסף קורס</PrimaryButton>
+        <PrimaryButton onClick={submit}>{editing ? 'שמור שינויים' : 'הוסף קורס'}</PrimaryButton>
       </div>
-    </Sheet>
+    </>
   )
 }

@@ -73,4 +73,83 @@ assert.ok(isoLte(scheduledDay, addDaysIso(exam.date, -1)), 'no later than buffer
 s = buildSchedule([task('a', 'c1', 30, { dueDate: addDaysIso(T, -5) })], [], T, 180)
 assert.deepEqual(s[T].map((t) => t.id), ['a'])
 
-console.log('schedule.check.mjs: all 6 checks passed ✓')
+
+/* ---------------------------------------------------------------------------
+ * Exam label (mirrors examLabel in src/utils.ts)
+ * ------------------------------------------------------------------------- */
+const examLabel = (title, courseName) => {
+  const t = title.trim()
+  if (t && t !== 'מבחן') return t
+  return courseName ? `מבחן ב${courseName}` : 'מבחן'
+}
+
+// 7. A blank title, or the old literal default, falls back to the course name.
+assert.equal(examLabel('', 'כימיה'), 'מבחן בכימיה')
+assert.equal(examLabel('מבחן', 'כימיה'), 'מבחן בכימיה')  // legacy rows
+assert.equal(examLabel('  ', 'כימיה'), 'מבחן בכימיה')
+assert.equal(examLabel('מועד ב', 'כימיה'), 'מועד ב')      // a real title wins
+assert.equal(examLabel('', undefined), 'מבחן')            // course deleted
+
+/* ---------------------------------------------------------------------------
+ * ICS escaping + folding (mirrors src/ics.ts)
+ * ------------------------------------------------------------------------- */
+const esc = (s) => s.replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n')
+const fold = (line) => {
+  if (line.length <= 75) return line
+  const parts = [line.slice(0, 75)]
+  for (let i = 75; i < line.length; i += 74) parts.push(' ' + line.slice(i, i + 74))
+  return parts.join('\r\n')
+}
+
+// 8. RFC 5545 special characters are escaped, so one field can't break the file.
+assert.equal(esc('a,b;c\\d'), 'a\\,b\\;c\\\\d')
+assert.equal(esc('line1\nline2'), 'line1\\nline2')
+
+// 9. Long lines fold, and every continuation line starts with a space.
+const folded = fold('SUMMARY:' + 'x'.repeat(200)).split('\r\n')
+assert.ok(folded.length > 1, 'long line folds')
+assert.ok(folded[0].length <= 75, 'first segment within 75 octets')
+assert.ok(folded.slice(1).every((l) => l.startsWith(' ')), 'continuations are space-prefixed')
+assert.equal(folded.join('').replace(/ /g, ''), 'SUMMARY:' + 'x'.repeat(200), 'unfolds to the original')
+
+// 10. Short lines are left alone.
+assert.equal(fold('SUMMARY:short'), 'SUMMARY:short')
+
+/* ---------------------------------------------------------------------------
+ * Cloud sync race (mirrors the dirty-flag logic in src/cloud.ts)
+ *
+ * The bug: a snapshot landing inside the 700ms debounce window overwrote the
+ * edit the user had just made, which then reappeared once the queued write
+ * completed — on screen, a reset followed by a delayed response.
+ * ------------------------------------------------------------------------- */
+function makeSync() {
+  let local = 'server'
+  let dirty = false
+  let queued = false
+  return {
+    read: () => local,
+    edit(v) { local = v; dirty = true; queued = true },
+    /** A snapshot arriving from the server. */
+    remote(v) { if (dirty) return; local = v },
+    /** The debounced write firing, then being acknowledged. */
+    flush() { queued = false; if (!queued) dirty = false; return local },
+  }
+}
+
+// 11. A remote snapshot mid-edit does NOT clobber the local edit.
+let sync = makeSync()
+sync.edit('mine')
+sync.remote('stale')                       // this used to win, causing the flicker
+assert.equal(sync.read(), 'mine', 'local edit survives a snapshot in the window')
+assert.equal(sync.flush(), 'mine', 'the value written is the one on screen')
+
+// 12. Once the write is acknowledged, remote snapshots apply again.
+sync.remote('from-other-device')
+assert.equal(sync.read(), 'from-other-device', 'sync resumes after the write settles')
+
+// 13. Without an edit in flight, a snapshot applies immediately.
+sync = makeSync()
+sync.remote('from-phone')
+assert.equal(sync.read(), 'from-phone')
+
+console.log('schedule.check.mjs: all 13 checks passed ✓')

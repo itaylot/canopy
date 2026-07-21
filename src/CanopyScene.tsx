@@ -1,22 +1,91 @@
+import { useEffect, useMemo, useRef } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
+import { useStore, type SceneKey } from './store'
 
 // Illustration coordinate space (matches scene-bg-min.png at 1400x700).
 const W = 1400
 const H = 700
 const MAX_NODES = 7
 
-// Rope anchors on the two tree platforms + sag control point, calibrated to
-// the background art. If the art changes, re-tune these three points only.
-const A = { x: 133, y: 430 }
-const B = { x: 1313, y: 494 }
-const C = { x: 700, y: 560 }
+/**
+ * Backgrounds are data, not code. Each scene carries its own rope anchors,
+ * because the overlay is drawn in the illustration's coordinate space — art
+ * with a different composition needs its own a/b/c or the rope misses the
+ * trees. Adding a background = drop a PNG in /public, add a row here.
+ */
+type Scene = {
+  label: string
+  src: string
+  /** Rope anchors: the two tree platforms + the sag control point between them. */
+  a: { x: number; y: number }
+  b: { x: number; y: number }
+  c: { x: number; y: number }
+  rope: string
+  /** Applied to the background image only, never to the overlay. */
+  filter?: string
+  dark?: boolean
+}
 
-function ropePoint(t: number) {
+// Calibrated against scene-bg-min.png. If that art changes, re-tune these three.
+const FOREST_ANCHORS = {
+  a: { x: 133, y: 430 },
+  b: { x: 1313, y: 494 },
+  c: { x: 700, y: 560 },
+}
+
+export const SCENES: Record<'forest' | 'night', Scene> = {
+  forest: { label: 'יער · יום', src: '/scene-bg-min.png', ...FOREST_ANCHORS, rope: '#a07b3f' },
+  // Night reuses the daytime art through a filter instead of a second asset:
+  // same composition, so the anchors carry over untouched and there's nothing
+  // extra to download. A dedicated night illustration can replace `src` later.
+  night: {
+    label: 'יער · לילה',
+    src: '/scene-bg-min.png',
+    ...FOREST_ANCHORS,
+    rope: '#d8b981',
+    filter: 'saturate(0.5) brightness(0.55) hue-rotate(185deg) contrast(1.08)',
+    dark: true,
+  },
+}
+
+/** 'auto' follows the clock; anything else is the user's explicit pick. */
+export const resolveScene = (pref: SceneKey, hour: number): Scene =>
+  pref === 'forest' || pref === 'night' ? SCENES[pref] : hour >= 20 || hour < 6 ? SCENES.night : SCENES.forest
+
+/** Short hop between neighbouring checkpoints, slow victory glide when the
+ *  day's route is finished — the completion moment should be watchable. */
+const glideDuration = (distance: number, finishing: boolean) =>
+  distance < 0.001 ? 0 : finishing ? 1.9 : Math.min(1.2, 0.45 + distance * 2)
+
+const makeRopePoint = (s: Scene) => (t: number) => {
   const u = 1 - t
   return {
-    x: u * u * A.x + 2 * u * t * C.x + t * t * B.x,
-    y: u * u * A.y + 2 * u * t * C.y + t * t * B.y,
+    x: u * u * s.a.x + 2 * u * t * s.c.x + t * t * s.b.x,
+    y: u * u * s.a.y + 2 * u * t * s.c.y + t * t * s.b.y,
   }
+}
+
+/** Fixed positions, not random: a re-render must not reshuffle the sky. */
+const STAR_POS = [
+  [8, 12], [17, 26], [26, 8], [35, 19], [44, 30], [52, 11],
+  [61, 22], [70, 9], [78, 27], [86, 15], [93, 31], [12, 38],
+] as const
+
+function Stars() {
+  const reduce = useReducedMotion()
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden>
+      {STAR_POS.map(([x, y], i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full bg-white"
+          style={{ left: `${x}%`, top: `${y}%`, width: i % 3 === 0 ? 3 : 2, height: i % 3 === 0 ? 3 : 2 }}
+          animate={reduce ? { opacity: 0.7 } : { opacity: [0.35, 0.9, 0.35] }}
+          transition={{ duration: 2.6 + (i % 4) * 0.7, repeat: reduce ? 0 : Infinity, ease: 'easeInOut' }}
+        />
+      ))}
+    </div>
+  )
 }
 
 /**
@@ -26,32 +95,66 @@ function ropePoint(t: number) {
  */
 export function CanopyScene({ done, remaining }: { done: number; remaining: number }) {
   const reduce = useReducedMotion()
+  const pref = useStore((s) => s.scene)
+  const scene = resolveScene(pref, new Date().getHours())
+  const ropePoint = useMemo(() => makeRopePoint(scene), [scene])
   const total = Math.min(done + remaining, MAX_NODES)
   const doneShown = total === 0 ? 0 : Math.min(done, total)
 
-  const nodes = Array.from({ length: total }, (_, i) => {
-    const t = 0.16 + (0.68 * (i + (total === 1 ? 0.5 : 0))) / Math.max(total - 1, 1)
-    return { ...ropePoint(t), state: i < doneShown ? 'done' : i === doneShown ? 'current' : 'todo' }
-  })
-  const riderAt =
+  const nodeT = (i: number) =>
+    0.16 + (0.68 * (i + (total === 1 ? 0.5 : 0))) / Math.max(total - 1, 1)
+
+  const nodes = Array.from({ length: total }, (_, i) => ({
+    ...ropePoint(nodeT(i)),
+    state: i < doneShown ? 'done' : i === doneShown ? 'current' : 'todo',
+  }))
+
+  // Where the rider hangs, as a position along the rope (0 = near tree, 1 = far).
+  const riderT =
     total === 0
-      ? ropePoint(0.5)
+      ? 0.5
       : doneShown >= total
-        ? ropePoint(0.92) // route finished: rider glides off toward the far tree
-        : nodes[doneShown]
+        ? 0.92 // route finished: rider glides off toward the far tree
+        : nodeT(doneShown)
 
   // The rider PNG is trimmed so the pulley wheel sits at its very top center.
   const riderW = 8.5 // % of scene width
-  const riderH = riderW * (W / H) * 1.18 // aspect of the trimmed sprite
+
+  // Travel along the *curve* rather than straight between checkpoints: sample
+  // the rope between the last position and the new one and hand the samples to
+  // Motion as keyframes. Finishing the day is a longer, more deliberate glide.
+  const prevT = useRef(riderT)
+  const from = prevT.current
+  const distance = Math.abs(riderT - from)
+  const finishing = doneShown >= total && total > 0
+  useEffect(() => {
+    prevT.current = riderT
+  }, [riderT])
+
+  const path = useMemo(() => {
+    const steps = distance < 0.001 ? 1 : Math.max(2, Math.round(distance * 40))
+    const pts = Array.from({ length: steps + 1 }, (_, i) => ropePoint(from + ((riderT - from) * i) / steps))
+    return {
+      left: pts.map((p) => (p.x / W) * 100 - riderW / 2),
+      top: pts.map((p) => (p.y / H) * 100 - 1.5),
+    }
+    // `from` is a ref read: intentionally not a dependency, riderT drives it.
+  }, [riderT, distance, from, ropePoint])
 
   return (
     <div className="relative w-full overflow-hidden" role="img" aria-label="מסלול ההתקדמות">
-      <img src="/scene-bg-min.png" alt="" className="block w-full" />
+      <img
+        src={scene.src}
+        alt=""
+        className="block w-full transition-[filter] duration-700"
+        style={{ filter: scene.filter }}
+      />
+      {scene.dark && <Stars />}
 
       <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full">
         <path
-          d={`M ${A.x} ${A.y} Q ${C.x} ${C.y} ${B.x} ${B.y}`}
-          stroke="#a07b3f"
+          d={`M ${scene.a.x} ${scene.a.y} Q ${scene.c.x} ${scene.c.y} ${scene.b.x} ${scene.b.y}`}
+          stroke={scene.rope}
           strokeWidth="7"
           fill="none"
           strokeLinecap="round"
@@ -95,13 +198,18 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
           src="/rider-clean.png"
           alt=""
           className="absolute"
-          style={{
-            width: `${riderW}%`,
-            left: `calc(${(riderAt.x / W) * 100}% - ${riderW / 2}%)`,
-            top: `${(riderAt.y / H) * 100 - 1.5}%`,
+          style={{ width: `${riderW}%` }}
+          initial={false}
+          animate={{
+            left: reduce ? `${path.left[path.left.length - 1]}%` : path.left.map((v) => `${v}%`),
+            top: reduce ? `${path.top[path.top.length - 1]}%` : path.top.map((v) => `${v}%`),
+            y: reduce ? 0 : [0, -4, 0],
           }}
-          animate={reduce ? {} : { y: [0, -4, 0] }}
-          transition={{ duration: 3, repeat: reduce ? 0 : Infinity, ease: 'easeInOut' }}
+          transition={{
+            left: { duration: reduce ? 0 : glideDuration(distance, finishing), ease: 'easeInOut' },
+            top: { duration: reduce ? 0 : glideDuration(distance, finishing), ease: 'easeInOut' },
+            y: { duration: 3, repeat: reduce ? 0 : Infinity, ease: 'easeInOut' },
+          }}
         />
       )}
     </div>

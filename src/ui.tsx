@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
 import type { Course, Task } from './store'
 import { formatDuration } from './utils'
 
@@ -93,15 +94,20 @@ export function TaskRow({
   task,
   course,
   onToggle,
+  onEdit,
   onDelete,
   flat = false,
+  draggable = false,
 }: {
   task: Task
   course?: Course
   onToggle: () => void
+  onEdit?: () => void
   onDelete?: () => void
   /** Renders as a plain row (for lists inside one Card with dividers) instead of a standalone card. */
   flat?: boolean
+  /** Desktop week planner: makes the row a drag source carrying the task id. */
+  draggable?: boolean
 }) {
   return (
     <motion.div
@@ -109,11 +115,15 @@ export function TaskRow({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-      className={
+      draggable={draggable || undefined}
+      onDragStart={
+        draggable ? (e) => (e as unknown as DragEvent).dataTransfer?.setData('text/task-id', task.id) : undefined
+      }
+      className={`${
         flat
           ? 'flex items-center gap-3 px-1 py-3'
           : 'flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-lg'
-      }
+      } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <span
         aria-hidden
@@ -133,14 +143,18 @@ export function TaskRow({
         </div>
       </button>
 
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          className="shrink-0 rounded-full px-1.5 text-sm text-muted transition-colors hover:text-accent"
-          aria-label="מחק משימה"
-        >
-          ✕
-        </button>
+      {onEdit && onDelete ? (
+        <RowMenu onEdit={onEdit} onDelete={onDelete} />
+      ) : (
+        onDelete && (
+          <button
+            onClick={onDelete}
+            className="shrink-0 rounded-full px-1.5 text-sm text-muted transition-colors hover:text-accent"
+            aria-label="מחק משימה"
+          >
+            ✕
+          </button>
+        )
       )}
 
       <motion.button
@@ -152,6 +166,63 @@ export function TaskRow({
         <Checkbox done={task.done} />
       </motion.button>
     </motion.div>
+  )
+}
+
+/* ---------- Row overflow menu (edit / delete) ---------- */
+/** One menu for every kind of row — task, exam, course. Closes on outside
+ *  click via a full-screen transparent backdrop, which also stops the click
+ *  from reaching whatever is underneath. */
+export function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span className="relative shrink-0">
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen((o) => !o)
+        }}
+        aria-label="אפשרויות"
+        aria-expanded={open}
+        className="grid h-8 w-8 place-items-center rounded-full text-muted transition-colors hover:bg-primary-soft hover:text-ink"
+      >
+        <DotsThree weight="bold" size={20} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              transition={{ duration: 0.14 }}
+              className="absolute left-0 top-9 z-50 w-36 overflow-hidden rounded-xl bg-surface py-1 text-right shadow-lg ring-1 ring-line"
+            >
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  onEdit()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink transition-colors hover:bg-primary-soft"
+              >
+                <PencilSimple size={16} /> עריכה
+              </button>
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  onDelete()
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                <Trash size={16} /> מחיקה
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </span>
   )
 }
 

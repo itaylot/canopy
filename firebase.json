@@ -1,7 +1,19 @@
 {
   "hosting": {
     "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "*.pdf",
+      "**/*.pdf",
+      "*.docx",
+      "**/*.docx",
+      "*.xlsx",
+      "**/*.xlsx",
+      "*.pptx",
+      "**/*.pptx"
+    ],
     "rewrites": [{ "source": "**", "destination": "/index.html" }]
   },
   "firestore": {

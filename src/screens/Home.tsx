@@ -21,6 +21,7 @@ import {
   startOfWeekIso,
   formatDuration,
   monthLabel,
+  examLabel,
 } from '../utils'
 import { TaskRow, LeafBurst, Card } from '../ui'
 import { CanopyScene } from '../CanopyScene'
@@ -147,7 +148,9 @@ export default function Home() {
                     <span className="text-lg font-bold text-ink">{dayOfMonth(e.date)}</span>
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate font-semibold text-ink">{e.title}</span>
+                    <span className="block truncate font-semibold text-ink">
+                      {examLabel(e.title, courseById.get(e.courseId)?.name)}
+                    </span>
                     <span className="block truncate text-xs text-muted">
                       {courseById.get(e.courseId)?.name} · {relativeDaysHe(today, e.date)}
                     </span>

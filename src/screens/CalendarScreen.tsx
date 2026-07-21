@@ -1,26 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { CaretRight, CaretLeft, Plus } from '@phosphor-icons/react'
 import { useStore, type Course, type Exam, type Task } from '../store'
 import { buildSchedule } from '../schedule'
-import {
-  todayIso,
-  toIso,
-  monthLabel,
-  formatHe,
-  startOfWeekIso,
-  addDaysIso,
-  weekRangeLabel,
-} from '../utils'
-import { Sheet, TaskRow, Field, inputClass, PrimaryButton } from '../ui'
+import { WeekPlanner } from './WeekPlanner'
+import { todayIso, toIso, monthLabel, formatHe, startOfWeekIso, addDaysIso, examLabel } from '../utils'
+import { Sheet, TaskRow, Field, inputClass, PrimaryButton, RowMenu } from '../ui'
 
 const WEEKDAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
 
 export default function CalendarScreen() {
-  const { tasks, exams, courses, dailyCap, toggleTask, addExam } = useStore()
+  const { tasks, exams, courses, dailyCap, toggleTask, addExam, updateExam, removeExam } = useStore()
   const today = todayIso()
   const now = new Date()
   const [view, setView] = useState<'month' | 'week'>('month')
+  const [editingExam, setEditingExam] = useState<Exam | null>(null)
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
   const [weekStart, setWeekStart] = useState(startOfWeekIso(today))
@@ -153,7 +147,11 @@ export default function CalendarScreen() {
                   key={iso}
                   whileTap={{ scale: 0.92 }}
                   onClick={() => setSelected(iso)}
-                  title={dayExams.map((e) => e.title).join(', ') || undefined}
+                  title={
+                    dayExams
+                      .map((e) => examLabel(e.title, courseById.get(e.courseId)?.name))
+                      .join(', ') || undefined
+                  }
                   className={`relative flex min-h-14 flex-col items-center gap-0.5 rounded-xl px-0.5 pt-1.5 text-sm transition-colors ${
                     isToday ? 'bg-primary font-bold text-white' : 'text-ink hover:bg-primary-soft'
                   }`}
@@ -165,7 +163,7 @@ export default function CalendarScreen() {
                         isToday ? 'bg-white/25 text-white' : 'bg-accent-soft text-ink'
                       }`}
                     >
-                      {dayExams[0].title}
+                      {examLabel(dayExams[0].title, courseById.get(dayExams[0].courseId)?.name)}
                     </span>
                   )}
                   {hasTasks && (
@@ -190,15 +188,15 @@ export default function CalendarScreen() {
           </div>
         </div>
       ) : (
-        <WeekView
+        <WeekPlanner
           weekStart={weekStart}
           onStep={(d) => setWeekStart(addDaysIso(weekStart, d * 7))}
           onJumpToday={() => setWeekStart(startOfWeekIso(today))}
           today={today}
-          visibleTasksOf={visibleTasksOf}
-          visibleExamsOf={visibleExamsOf}
+          schedule={schedule}
+          hidden={hidden}
           courseById={courseById}
-          onToggleTask={toggleTask}
+          examsByDay={examsByDay}
         />
       )}
 
@@ -208,87 +206,20 @@ export default function CalendarScreen() {
         tasks={selected ? visibleTasksOf(selected) : []}
         exams={selected ? visibleExamsOf(selected) : []}
         onToggle={toggleTask}
+        onEditExam={(e) => {
+          setSelected(null)
+          setEditingExam(e)
+        }}
+        onDeleteExam={removeExam}
         courseById={courseById}
       />
-      <AddExam open={addingExam} onClose={() => setAddingExam(false)} />
-    </div>
-  )
-}
-
-function WeekView({
-  weekStart,
-  onStep,
-  onJumpToday,
-  today,
-  visibleTasksOf,
-  visibleExamsOf,
-  courseById,
-  onToggleTask,
-}: {
-  weekStart: string
-  onStep: (delta: number) => void
-  onJumpToday: () => void
-  today: string
-  visibleTasksOf: (iso: string) => Task[]
-  visibleExamsOf: (iso: string) => Exam[]
-  courseById: Map<string, Course>
-  onToggleTask: (id: string) => void
-}) {
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i)), [weekStart])
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-2xl bg-surface p-3 shadow-card">
-        <button onClick={() => onStep(-1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft">
-          <CaretRight size={20} />
-        </button>
-        <button onClick={onJumpToday} className="text-sm font-semibold text-ink">
-          {weekRangeLabel(weekStart)}
-        </button>
-        <button onClick={() => onStep(1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft">
-          <CaretLeft size={20} />
-        </button>
-      </div>
-
-      <div className="space-y-2.5">
-        {days.map((iso) => {
-          const dayTasks = visibleTasksOf(iso)
-          const dayExams = visibleExamsOf(iso)
-          const isToday = iso === today
-          const empty = dayTasks.length === 0 && dayExams.length === 0
-          return (
-            <div
-              key={iso}
-              className={`rounded-2xl p-3 ${
-                isToday ? 'bg-primary-soft' : 'bg-surface shadow-card'
-              }`}
-            >
-              <p className={`text-sm font-semibold ${isToday ? 'text-primary' : 'text-ink'}`}>{formatHe(iso)}</p>
-              {empty ? (
-                <p className="mt-1 text-xs text-muted">אין כלום מתוכנן</p>
-              ) : (
-                <div className="mt-2 space-y-2">
-                  {dayExams.map((e) => {
-                    const c = courseById.get(e.courseId)
-                    return (
-                      <div key={e.id} className="rounded-xl bg-accent-soft px-3 py-2 text-sm font-medium text-ink">
-                        📌 {e.title}
-                        <span className="text-xs text-muted">
-                          {' '}
-                          · {c?.emoji} {c?.name}
-                        </span>
-                      </div>
-                    )
-                  })}
-                  {dayTasks.map((t) => (
-                    <TaskRow key={t.id} task={t} course={courseById.get(t.courseId)} onToggle={() => onToggleTask(t.id)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      <ExamForm open={addingExam} onClose={() => setAddingExam(false)} onSubmit={addExam} />
+      <ExamForm
+        open={!!editingExam}
+        editing={editingExam}
+        onClose={() => setEditingExam(null)}
+        onSubmit={(e) => editingExam && updateExam(editingExam.id, e)}
+      />
     </div>
   )
 }
@@ -299,6 +230,8 @@ function DaySheet({
   tasks,
   exams,
   onToggle,
+  onEditExam,
+  onDeleteExam,
   courseById,
 }: {
   iso: string | null
@@ -306,6 +239,8 @@ function DaySheet({
   tasks: Task[]
   exams: Exam[]
   onToggle: (id: string) => void
+  onEditExam: (e: Exam) => void
+  onDeleteExam: (id: string) => void
   courseById: Map<string, Course>
 }) {
   return (
@@ -314,12 +249,15 @@ function DaySheet({
         {exams.map((e) => {
           const c = courseById.get(e.courseId)
           return (
-            <div key={e.id} className="rounded-2xl bg-accent-soft px-4 py-3 font-medium text-ink">
-              📌 {e.title}
-              <span className="text-sm text-muted">
-                {' '}
-                · {c?.emoji} {c?.name}
+            <div key={e.id} className="flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-3 font-medium text-ink">
+              <span className="min-w-0 flex-1">
+                📌 {examLabel(e.title, c?.name)}
+                <span className="text-sm text-muted">
+                  {' '}
+                  · {c?.emoji} {c?.name}
+                </span>
               </span>
+              <RowMenu onEdit={() => onEditExam(e)} onDelete={() => onDeleteExam(e.id)} />
             </div>
           )
         })}
@@ -336,25 +274,57 @@ function DaySheet({
   )
 }
 
-function AddExam({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { courses, addExam } = useStore()
-  const [courseId, setCourseId] = useState('')
-  const [title, setTitle] = useState('מבחן')
-  const [date, setDate] = useState('')
+function ExamForm({
+  open,
+  onClose,
+  onSubmit,
+  editing,
+}: {
+  open: boolean
+  onClose: () => void
+  onSubmit: (e: Omit<Exam, 'id'>) => void
+  editing?: Exam | null
+}) {
+  const [nonce, setNonce] = useState(0)
+  useEffect(() => {
+    if (open) setNonce((n) => n + 1)
+  }, [open])
+
+  return (
+    <Sheet open={open} onClose={onClose} title={editing ? 'עריכת מבחן' : 'הוספת מבחן'}>
+      <ExamFormBody key={`${editing?.id ?? 'new'}-${nonce}`} onClose={onClose} onSubmit={onSubmit} editing={editing} />
+    </Sheet>
+  )
+}
+
+function ExamFormBody({
+  onClose,
+  onSubmit,
+  editing,
+}: {
+  onClose: () => void
+  onSubmit: (e: Omit<Exam, 'id'>) => void
+  editing?: Exam | null
+}) {
+  const { courses } = useStore()
+  const [courseId, setCourseId] = useState(editing?.courseId ?? courses[0]?.id ?? '')
+  // Blank by default. This field used to be seeded with the literal "מבחן",
+  // which is why saved exams showed no hint of which exam they were.
+  const [title, setTitle] = useState(editing && editing.title !== 'מבחן' ? editing.title : '')
+  const [date, setDate] = useState(editing?.date ?? '')
+
+  const courseName = courses.find((c) => c.id === courseId)?.name
 
   const submit = () => {
-    const cid = courseId || courses[0]?.id
-    if (!cid || !date) return
-    addExam({ courseId: cid, title: title.trim() || 'מבחן', date })
-    setTitle('מבחן')
-    setDate('')
+    if (!courseId || !date) return
+    onSubmit({ courseId, title: title.trim(), date })
     onClose()
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="הוספת מבחן">
+    <>
       <Field label="קורס">
-        <select className={inputClass} value={courseId || courses[0]?.id || ''} onChange={(e) => setCourseId(e.target.value)}>
+        <select className={inputClass} value={courseId} onChange={(e) => setCourseId(e.target.value)}>
           {courses.map((c) => (
             <option key={c.id} value={c.id}>
               {c.emoji} {c.name}
@@ -362,15 +332,23 @@ function AddExam({ open, onClose }: { open: boolean; onClose: () => void }) {
           ))}
         </select>
       </Field>
-      <Field label="כותרת">
-        <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
+      <Field label="כותרת (רשות)">
+        <input
+          className={inputClass}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={examLabel('', courseName)}
+        />
       </Field>
       <Field label="תאריך">
         <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
       </Field>
+      <p className="mb-3 -mt-1 text-xs text-muted">
+        בלי כותרת, המבחן יופיע כ"{examLabel('', courseName)}".
+      </p>
       <div className="mt-2">
-        <PrimaryButton onClick={submit}>הוסף מבחן</PrimaryButton>
+        <PrimaryButton onClick={submit}>{editing ? 'שמור שינויים' : 'הוסף מבחן'}</PrimaryButton>
       </div>
-    </Sheet>
+    </>
   )
 }

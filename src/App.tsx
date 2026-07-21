@@ -63,7 +63,7 @@ function MainApp({ user }: { user: FirebaseUser }) {
           {/* signed-in user, inside the menu (frees the whole top strip of the page) */}
           <button
             onClick={() => setTab('profile')}
-            className="mx-3 mt-3 flex items-center gap-2.5 rounded-xl border-t border-line/60 bg-surface/80 px-3 py-3 text-right backdrop-blur-sm transition-colors hover:bg-surface"
+            className="mx-3 mb-3 mt-auto flex items-center gap-2.5 rounded-xl bg-surface/80 px-3 py-3 text-right backdrop-blur-sm transition-colors hover:bg-surface"
           >
             {user.photoURL ? (
               <img src={user.photoURL} alt="" className="h-8 w-8 shrink-0 rounded-full" />

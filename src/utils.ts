@@ -59,6 +59,16 @@ export const startOfWeekIso = (iso: string) => {
 export const weekRangeLabel = (startIso: string) =>
   `${heShort.format(parseIso(startIso))} – ${heShort.format(parseIso(addDaysIso(startIso, 6)))}`
 
+// An exam with no title of its own is shown as "מבחן ב<קורס>" rather than a
+// bare "מבחן", which said nothing about which exam it was. The literal 'מבחן'
+// is treated as empty too — it used to be the form's default value, so it sits
+// in already-saved exams. Derived at display time, so no data migration.
+export const examLabel = (title: string, courseName?: string) => {
+  const t = title.trim()
+  if (t && t !== 'מבחן') return t
+  return courseName ? `מבחן ב${courseName}` : 'מבחן'
+}
+
 // Tasks are stored in minutes (that's what the scheduler and daily cap use),
 // but people think in hours — these format/pick helpers keep the UI hour-based
 // without touching the underlying data model.
