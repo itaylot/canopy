@@ -70,19 +70,10 @@ export default function Home() {
         </p>
       </header>
 
-      {/* Row 1: the scene next to today's tasks, like the mockup. In RTL the
-          first column (the scene, the star of the screen) sits on the right. */}
-      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-5 lg:space-y-0">
-        <Card className="overflow-hidden">
-          {/* the illustration's own cream sky is the card surface */}
-          <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
-          <p className="px-4 py-3 text-center text-sm text-muted">
-            {tasks.length === 0
-              ? 'הוסף משימות כדי למתוח את המסלול.'
-              : 'השלם משימות כדי להאריך את המסלול.'}
-          </p>
-        </Card>
-
+      {/* Row 1. Today's tasks come first in DOM order, so in RTL they sit on
+          the right, where reading starts and attention lands. The scene is the
+          reward for doing them, not the thing to look at first. */}
+      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-start lg:gap-5 lg:space-y-0">
         <Card className="p-4">
           <div className="mb-1 flex items-baseline justify-between">
             <h2 className="font-bold text-ink">המשימות להיום</h2>
@@ -128,6 +119,16 @@ export default function Home() {
               </div>
             )}
           </div>
+        </Card>
+
+        <Card className="overflow-hidden">
+          {/* the illustration's own cream sky is the card surface */}
+          <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
+          <p className="px-4 py-3 text-center text-sm text-muted">
+            {tasks.length === 0
+              ? 'הוסף משימות כדי למתוח את המסלול.'
+              : 'השלם משימות כדי להאריך את המסלול.'}
+          </p>
         </Card>
       </div>
 
