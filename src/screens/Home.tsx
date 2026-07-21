@@ -74,8 +74,8 @@ export default function Home() {
       {/* Row 1. Today's tasks come first in DOM order, so in RTL they sit on
           the right, where reading starts and attention lands. The scene is the
           reward for doing them, not the thing to look at first. */}
-      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-start lg:gap-5 lg:space-y-0">
-        <Card className="p-4">
+      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-stretch lg:gap-5 lg:space-y-0">
+        <Card className="p-4 lg:h-full">
           <div className="mb-1 flex items-baseline justify-between">
             <h2 className="font-bold text-ink">המשימות להיום</h2>
             {total > 0 && (
@@ -122,19 +122,26 @@ export default function Home() {
           </div>
         </Card>
 
-        <Card className="overflow-hidden">
-          {/* the illustration's own cream sky is the card surface */}
-          <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
-          <p className="px-4 py-3 text-center text-sm text-muted">
-            {tasks.length === 0
-              ? 'הוסף משימות כדי למתוח את המסלול.'
-              : 'השלם משימות כדי להאריך את המסלול.'}
-          </p>
-        </Card>
+        {/* The scene is much shorter than the task list, so the timer sits
+            under it and absorbs the leftover height instead of leaving a hole
+            beside the tasks. */}
+        <div className="space-y-5 lg:flex lg:h-full lg:flex-col lg:space-y-0 lg:gap-5">
+          <Card className="overflow-hidden">
+            {/* the illustration's own cream sky is the card surface */}
+            <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
+            <p className="px-4 py-3 text-center text-sm text-muted">
+              {tasks.length === 0
+                ? 'הוסף משימות כדי למתוח את המסלול.'
+                : 'השלם משימות כדי להאריך את המסלול.'}
+            </p>
+          </Card>
+
+          <FocusTimer className="lg:min-h-0 lg:flex-1" />
+        </div>
       </div>
 
       {/* Row 2: supporting cards */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="p-4">
           <h2 className="mb-3 font-bold text-ink">מבחנים קרובים</h2>
           {upcomingExams.length === 0 ? (
@@ -162,8 +169,6 @@ export default function Home() {
         </Card>
 
         <WeeklySummary />
-
-        <FocusTimer />
 
         <MiniMonth schedule={schedule} today={today} />
       </div>
@@ -282,7 +287,7 @@ const FOCUS_MINUTES = 25
 
 /** A plain countdown for a focus session. Session-scoped on purpose: nothing
  *  is written to the cloud, so a half-finished timer can't pollute the data. */
-function FocusTimer() {
+function FocusTimer({ className = '' }: { className?: string }) {
   const [left, setLeft] = useState(FOCUS_MINUTES * 60)
   const [running, setRunning] = useState(false)
   const [donePings, setDonePings] = useState(0)
@@ -313,12 +318,12 @@ function FocusTimer() {
   }
 
   return (
-    <Card className="flex flex-col p-4">
+    <Card className={`flex flex-col p-4 ${className}`}>
       <h2 className="mb-3 flex items-center gap-1.5 font-bold text-ink">
         <Timer size={18} className="text-primary" /> זמן מיקוד
       </h2>
 
-      <div className="flex flex-1 items-center gap-4">
+      <div className="flex flex-1 items-center justify-center gap-5">
         <div className="relative grid h-20 w-20 shrink-0 place-items-center">
           <svg viewBox="0 0 40 40" className="absolute inset-0 -rotate-90">
             <circle cx="20" cy="20" r="17" fill="none" stroke="var(--line)" strokeWidth="4" />
