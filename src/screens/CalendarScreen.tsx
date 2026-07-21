@@ -3,9 +3,8 @@ import { motion } from 'motion/react'
 import { CaretRight, CaretLeft, Plus } from '@phosphor-icons/react'
 import { useStore, type Course, type Exam, type Task } from '../store'
 import { buildSchedule } from '../schedule'
-import { WeekPlanner } from './WeekPlanner'
-import { todayIso, toIso, monthLabel, formatHe, startOfWeekIso, addDaysIso, examLabel } from '../utils'
-import { Sheet, TaskRow, Field, inputClass, PrimaryButton, RowMenu } from '../ui'
+import { todayIso, toIso, monthLabel, formatHe, examLabel } from '../utils'
+import { Sheet, TaskRow, Field, inputClass, PrimaryButton, RowMenu, CourseFilter } from '../ui'
 
 const WEEKDAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
 
@@ -13,17 +12,13 @@ export default function CalendarScreen() {
   const { tasks, exams, courses, dailyCap, toggleTask, addExam, updateExam, removeExam } = useStore()
   const today = todayIso()
   const now = new Date()
-  const [view, setView] = useState<'month' | 'week'>('month')
   const [editingExam, setEditingExam] = useState<Exam | null>(null)
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth())
-  const [weekStart, setWeekStart] = useState(startOfWeekIso(today))
   const [selected, setSelected] = useState<string | null>(null)
   const [addingExam, setAddingExam] = useState(false)
-  // Which courses are hidden from the calendar view — mirrors Google Calendar's
-  // "which calendars to show" checkbox list. Purely a display filter: the
-  // schedule itself is always computed from every task so capacity balancing
-  // stays correct regardless of what's currently shown.
+  // Display filter only — the schedule is always computed from every task, so
+  // hiding a course never changes where anything is scheduled.
   const [hidden, setHidden] = useState<Set<string>>(new Set())
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
@@ -42,13 +37,6 @@ export default function CalendarScreen() {
 
   const visibleTasksOf = (iso: string) => (schedule[iso] ?? []).filter((t) => !hidden.has(t.courseId))
   const visibleExamsOf = (iso: string) => (examsByDay.get(iso) ?? []).filter((e) => !hidden.has(e.courseId))
-
-  const toggleCourse = (id: string) =>
-    setHidden((s) => {
-      const next = new Set(s)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
 
   // Build the month grid: leading blanks (Sunday-first week) + all days.
   const cells = useMemo(() => {
@@ -79,43 +67,9 @@ export default function CalendarScreen() {
         </motion.button>
       </div>
 
-      {courses.length > 0 && (
-        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-          {courses.map((c) => {
-            const on = !hidden.has(c.id)
-            return (
-              <button
-                key={c.id}
-                onClick={() => toggleCourse(c.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-all ${
-                  on ? 'ring-line' : 'opacity-40 ring-line'
-                }`}
-                style={{ backgroundColor: on ? c.color + '1a' : 'transparent' }}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} />
-                {c.emoji} {c.name}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      <CourseFilter courses={courses} hidden={hidden} onToggle={setHidden} />
 
-      <div className="flex gap-1 rounded-full bg-primary-soft p-1 text-sm font-semibold">
-        {(['month', 'week'] as const).map((v) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            className={`flex-1 rounded-full py-2 transition-colors ${
-              view === v ? 'bg-surface text-primary shadow-card' : 'text-muted'
-            }`}
-          >
-            {v === 'month' ? 'חודש' : 'שבוע'}
-          </button>
-        ))}
-      </div>
-
-      {view === 'month' ? (
-        <div className="rounded-2xl bg-surface p-4 shadow-card">
+      <div className="rounded-2xl bg-surface p-4 shadow-card">
           <div className="mb-3 flex items-center justify-between">
             {/* In RTL, "previous" sits on the right visually */}
             <button onClick={() => stepMonth(-1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש קודם">
@@ -187,18 +141,6 @@ export default function CalendarScreen() {
             </span>
           </div>
         </div>
-      ) : (
-        <WeekPlanner
-          weekStart={weekStart}
-          onStep={(d) => setWeekStart(addDaysIso(weekStart, d * 7))}
-          onJumpToday={() => setWeekStart(startOfWeekIso(today))}
-          today={today}
-          schedule={schedule}
-          hidden={hidden}
-          courseById={courseById}
-          examsByDay={examsByDay}
-        />
-      )}
 
       <DaySheet
         iso={selected}

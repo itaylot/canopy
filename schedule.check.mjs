@@ -152,4 +152,49 @@ sync = makeSync()
 sync.remote('from-phone')
 assert.equal(sync.read(), 'from-phone')
 
-console.log('schedule.check.mjs: all 13 checks passed ✓')
+/* ---------------------------------------------------------------------------
+ * Week-planner drop hit test (mirrors zoneAt in src/screens/WeekPlanner.tsx)
+ *
+ * Motion reports the pointer in page coordinates while getBoundingClientRect
+ * is viewport-relative, so the caller adds scroll offset when building zones.
+ * These checks pin the boundary behaviour that decides which day a drop lands on.
+ * ------------------------------------------------------------------------- */
+function zoneAt(x, y, zones) {
+  for (const z of zones) {
+    if (x >= z.left && x <= z.right && y >= z.top && y <= z.bottom) return z.key
+  }
+  return null
+}
+
+// Two side-by-side day columns and a pool strip underneath.
+const ZONES = [
+  { key: '2026-07-20', left: 0, top: 0, right: 99, bottom: 199 },
+  { key: '2026-07-21', left: 100, top: 0, right: 199, bottom: 199 },
+  { key: 'pool', left: 0, top: 300, right: 199, bottom: 399 },
+]
+
+// 14. A drop inside a column resolves to that day.
+assert.equal(zoneAt(50, 100, ZONES), '2026-07-20')
+assert.equal(zoneAt(150, 100, ZONES), '2026-07-21')
+
+// 15. Edges are inclusive, and neighbouring columns do not overlap: a point
+//     belongs to exactly one day.
+assert.equal(zoneAt(99, 0, ZONES), '2026-07-20')
+assert.equal(zoneAt(100, 0, ZONES), '2026-07-21')
+
+// 16. Released in open space -> null, so the caller leaves the task untouched
+//     rather than silently assigning it somewhere.
+assert.equal(zoneAt(50, 250, ZONES), null, 'gap between columns and pool')
+assert.equal(zoneAt(-5, 100, ZONES), null, 'left of everything')
+assert.equal(zoneAt(50, 500, ZONES), null, 'below everything')
+
+// 17. The pool is a normal zone; the caller maps it to "no day".
+assert.equal(zoneAt(100, 350, ZONES), 'pool')
+
+// 18. Scrolled page: zones are built in page coordinates, so a pointer at
+//     pageY 1100 hits a column whose viewport top was 100 under 1000px scroll.
+const SCROLLED = [{ key: '2026-07-22', left: 0, top: 1100, right: 99, bottom: 1299 }]
+assert.equal(zoneAt(50, 1150, SCROLLED), '2026-07-22')
+assert.equal(zoneAt(50, 150, SCROLLED), null, 'viewport coords must not match')
+
+console.log('schedule.check.mjs: all 18 checks passed ✓')

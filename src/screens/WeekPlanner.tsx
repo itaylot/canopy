@@ -1,111 +1,173 @@
-import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, type PanInfo } from 'motion/react'
 import { CaretRight, CaretLeft, Sparkle } from '@phosphor-icons/react'
-import { useStore, type Course, type Exam, type Task } from '../store'
-import type { DaySchedule } from '../schedule'
-import { addDaysIso, formatHe, weekRangeLabel, examLabel, formatDuration, dayOfMonth } from '../utils'
-import { Sheet } from '../ui'
+import { useStore, type Course, type Task } from '../store'
+import { buildSchedule } from '../schedule'
+import {
+  todayIso,
+  addDaysIso,
+  startOfWeekIso,
+  formatHe,
+  weekRangeLabel,
+  examLabel,
+  formatDuration,
+  dayOfMonth,
+} from '../utils'
+import { Sheet, CourseFilter } from '../ui'
 
 const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 
+/** A drop target: the day it stands for, plus where it sits on the page. */
+export type Zone = { key: string; left: number; top: number; right: number; bottom: number }
+
 /**
- * The week as an editable board.
+ * Which drop zone a released chip landed on, or null if it was dropped in
+ * open space (the chip then springs back and nothing changes).
  *
- * There is no new data model here: a task pinned to a day is just `dueDate`
- * set, and `buildSchedule` already treats that as a fixed assignment. Dropping
- * a task on a day sets it; dropping it back in the pool clears it and hands
- * the task back to the auto-scheduler. That keeps the schedule fully derived —
- * nothing about the layout is ever persisted.
- *
- * Desktop uses native HTML5 drag and drop (no dependency). Touch drag is
- * genuinely bad and needs a library to fake, so mobile gets the same operation
- * as a tap-then-pick-a-day sheet instead.
+ * Pure and in page coordinates on purpose: Motion reports the pointer as
+ * pageX/pageY while getBoundingClientRect() is viewport-relative, so the
+ * caller adds scroll offset once, here, rather than everywhere.
  */
-export function WeekPlanner({
-  weekStart,
-  onStep,
-  onJumpToday,
-  today,
-  schedule,
-  hidden,
-  courseById,
-  examsByDay,
-}: {
-  weekStart: string
-  onStep: (delta: number) => void
-  onJumpToday: () => void
-  today: string
-  schedule: DaySchedule
-  hidden: Set<string>
-  courseById: Map<string, Course>
-  examsByDay: Map<string, Exam[]>
-}) {
-  const { tasks, toggleTask, setTaskDay } = useStore()
+export function zoneAt(x: number, y: number, zones: Zone[]): string | null {
+  for (const z of zones) {
+    if (x >= z.left && x <= z.right && y >= z.top && y <= z.bottom) return z.key
+  }
+  return null
+}
+
+const POOL = 'pool'
+
+/**
+ * Week planning: the screen where a task gets its day.
+ *
+ * Dragging uses Motion's pointer-based drag rather than HTML5 drag-and-drop,
+ * which does not exist on touch devices at all — and this app is used on a
+ * phone. One mechanism covers mouse and touch, and it survives the chip being
+ * covered by buttons, which native dragging does not reliably do.
+ */
+export default function WeekPlanner() {
+  const { tasks, exams, courses, dailyCap, toggleTask, setTaskDay } = useStore()
+  const today = todayIso()
+  const [weekStart, setWeekStart] = useState(startOfWeekIso(today))
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState<string | null>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
   const [picking, setPicking] = useState<Task | null>(null)
+
+  const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
+  const schedule = useMemo(
+    () => buildSchedule(tasks, exams, today, dailyCap),
+    [tasks, exams, today, dailyCap],
+  )
+  const examsByDay = useMemo(() => {
+    const m = new Map<string, typeof exams>()
+    exams.forEach((e) => {
+      if (!m.has(e.date)) m.set(e.date, [])
+      m.get(e.date)!.push(e)
+    })
+    return m
+  }, [exams])
 
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i)),
     [weekStart],
   )
-  const visible = (list: Task[]) => list.filter((t) => !hidden.has(t.courseId))
 
-  // The pool is everything still pending that the scheduler placed outside the
-  // week on screen — the tasks you'd want to pull in. Tasks already inside the
-  // week are shown in their day, not duplicated here.
+  // The pool holds pending tasks the scheduler placed outside the week on
+  // screen — the ones you'd want to pull in. Tasks already inside the week
+  // live in their day column instead of being listed twice.
   const pool = useMemo(() => {
     const insideWeek = new Set<string>()
     for (const d of days) for (const t of schedule[d] ?? []) insideWeek.add(t.id)
     return tasks.filter((t) => !t.done && !insideWeek.has(t.id) && !hidden.has(t.courseId))
   }, [tasks, schedule, days, hidden])
 
-  const drop = (day: string | undefined) => (e: React.DragEvent) => {
-    e.preventDefault()
-    const id = e.dataTransfer.getData('text/task-id')
-    if (id) setTaskDay(id, day)
-    setDragging(null)
+  // Drop targets register themselves so the hit test needs no DOM queries.
+  const zoneEls = useRef(new Map<string, HTMLElement>())
+  const registerZone = (key: string) => (el: HTMLElement | null) => {
+    if (el) zoneEls.current.set(key, el)
+    else zoneEls.current.delete(key)
   }
-  const allowDrop = (e: React.DragEvent) => e.preventDefault()
+  const zones = (): Zone[] =>
+    [...zoneEls.current.entries()].map(([key, el]) => {
+      const r = el.getBoundingClientRect()
+      // -> page coordinates, to match Motion's pageX/pageY pointer report
+      return {
+        key,
+        left: r.left + window.scrollX,
+        top: r.top + window.scrollY,
+        right: r.right + window.scrollX,
+        bottom: r.bottom + window.scrollY,
+      }
+    })
+
+  const onDragMove = (_: unknown, info: PanInfo) => {
+    setHovered(zoneAt(info.point.x, info.point.y, zones()))
+  }
+
+  const onDrop = (task: Task) => (_: unknown, info: PanInfo) => {
+    const key = zoneAt(info.point.x, info.point.y, zones())
+    setDragging(null)
+    setHovered(null)
+    if (!key) return // released in open space: leave the task alone
+    setTaskDay(task.id, key === POOL ? undefined : key)
+  }
+
+  const visible = (list: Task[]) => list.filter((t) => !hidden.has(t.courseId))
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-ink">תכנון שבוע</h1>
+      </div>
+
+      <CourseFilter courses={courses} hidden={hidden} onToggle={setHidden} />
+
       <div className="flex items-center justify-between rounded-2xl bg-surface p-3 shadow-card">
-        <button onClick={() => onStep(-1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="שבוע קודם">
+        <button
+          onClick={() => setWeekStart(addDaysIso(weekStart, -7))}
+          className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
+          aria-label="שבוע קודם"
+        >
           <CaretRight size={20} />
         </button>
-        <button onClick={onJumpToday} className="text-sm font-semibold text-ink">
+        <button onClick={() => setWeekStart(startOfWeekIso(today))} className="text-sm font-semibold text-ink">
           {weekRangeLabel(weekStart)}
         </button>
-        <button onClick={() => onStep(1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="שבוע הבא">
+        <button
+          onClick={() => setWeekStart(addDaysIso(weekStart, 7))}
+          className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
+          aria-label="שבוע הבא"
+        >
           <CaretLeft size={20} />
         </button>
       </div>
 
       <p className="px-1 text-xs text-muted">
-        <span className="hidden lg:inline">גרור משימה ליום אחר כדי לשבץ אותה מחדש.</span>
-        <span className="lg:hidden">הקש על משימה כדי לשבץ אותה ליום אחר.</span>
+        גרור משימה ליום כדי לקבע אותה שם, או הקש עליה כדי לבחור יום מרשימה.
       </p>
 
-      {/* Seven day columns on desktop, a stack on mobile */}
       <div className="grid gap-2.5 lg:grid-cols-7 lg:items-start">
-        {days.map((iso, dayIndex) => {
+        {days.map((iso, i) => {
           const dayTasks = visible(schedule[iso] ?? [])
           const dayExams = (examsByDay.get(iso) ?? []).filter((e) => !hidden.has(e.courseId))
           const isToday = iso === today
           const isPast = iso < today
+          const isTarget = hovered === iso
           return (
             <div
               key={iso}
-              onDragOver={allowDrop}
-              onDrop={drop(iso)}
+              ref={registerZone(iso)}
               className={`min-h-24 rounded-2xl p-2.5 transition-colors ${
                 isToday ? 'bg-primary-soft ring-1 ring-primary/40' : 'bg-surface shadow-card'
-              } ${dragging ? 'ring-2 ring-dashed ring-primary/50' : ''} ${isPast ? 'opacity-60' : ''}`}
+              } ${isTarget ? 'ring-2 ring-primary' : dragging ? 'ring-1 ring-dashed ring-primary/40' : ''} ${
+                isPast ? 'opacity-60' : ''
+              }`}
             >
               <div className="mb-1.5 flex items-baseline justify-between gap-1">
                 <span className={`text-xs font-semibold ${isToday ? 'text-primary' : 'text-ink'}`}>
                   <span className="lg:hidden">{formatHe(iso)}</span>
-                  <span className="hidden lg:inline">{WEEKDAYS[dayIndex]}</span>
+                  <span className="hidden lg:inline">{WEEKDAYS[i]}</span>
                 </span>
                 <span className="hidden text-[11px] tabular-nums text-muted lg:inline">{dayOfMonth(iso)}</span>
               </div>
@@ -124,7 +186,8 @@ export function WeekPlanner({
                       task={t}
                       course={courseById.get(t.courseId)}
                       onDragStart={() => setDragging(t.id)}
-                      onDragEnd={() => setDragging(null)}
+                      onDragMove={onDragMove}
+                      onDrop={onDrop(t)}
                       onPick={() => setPicking(t)}
                       onToggle={() => toggleTask(t.id)}
                     />
@@ -140,27 +203,21 @@ export function WeekPlanner({
         })}
       </div>
 
-      {/* Pool: pending tasks the scheduler put beyond this week */}
       <div
-        onDragOver={allowDrop}
-        onDrop={drop(undefined)}
+        ref={registerZone(POOL)}
         className={`rounded-2xl bg-surface p-3 shadow-card transition-colors ${
-          dragging ? 'ring-2 ring-dashed ring-primary/50' : ''
+          hovered === POOL ? 'ring-2 ring-primary' : dragging ? 'ring-1 ring-dashed ring-primary/40' : ''
         }`}
       >
         <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="text-sm font-bold text-ink">מאגר משימות</h3>
-          <span className="text-[11px] text-muted">מעבר ל-{weekRangeLabel(weekStart)}</span>
+          <h2 className="text-sm font-bold text-ink">מאגר משימות</h2>
+          <span className="text-[11px] text-muted">מחוץ לשבוע הזה</span>
         </div>
         {pool.length === 0 ? (
-          <p className="py-3 text-center text-xs text-muted">
-            כל המשימות הממתינות משובצות בשבוע הזה.
-          </p>
+          <p className="py-3 text-center text-xs text-muted">כל המשימות הממתינות משובצות בשבוע הזה.</p>
         ) : (
           <>
-            <p className="mb-2 text-[11px] text-muted">
-              גרור לכאן כדי לבטל שיבוץ ולהחזיר לשיבוץ אוטומטי.
-            </p>
+            <p className="mb-2 text-[11px] text-muted">גרור לכאן כדי לבטל קיבוע ולהחזיר לשיבוץ אוטומטי.</p>
             <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
               {pool.map((t) => (
                 <PlannerChip
@@ -168,7 +225,8 @@ export function WeekPlanner({
                   task={t}
                   course={courseById.get(t.courseId)}
                   onDragStart={() => setDragging(t.id)}
-                  onDragEnd={() => setDragging(null)}
+                  onDragMove={onDragMove}
+                  onDrop={onDrop(t)}
                   onPick={() => setPicking(t)}
                   onToggle={() => toggleTask(t.id)}
                 />
@@ -177,6 +235,10 @@ export function WeekPlanner({
           </>
         )}
       </div>
+
+      <p className="px-1 text-[11px] text-muted">
+        מסגרת מקווקוות = שובצה אוטומטית לפי המבחן הקרוב. גרירה מקבעת ליום שבחרת.
+      </p>
 
       <DayPicker
         task={picking}
@@ -188,27 +250,25 @@ export function WeekPlanner({
           setPicking(null)
         }}
       />
-
-      <p className="px-1 text-[11px] text-muted">
-        מסגרת מקווקוות = שובצה אוטומטית. שיבוץ ידני מקבע אותה ליום שבחרת.
-      </p>
     </div>
   )
 }
 
-/** A compact task card: drag handle on desktop, tap-to-reschedule on mobile. */
+/** A draggable task card. Drag works with mouse and touch alike. */
 function PlannerChip({
   task,
   course,
   onDragStart,
-  onDragEnd,
+  onDragMove,
+  onDrop,
   onPick,
   onToggle,
 }: {
   task: Task
   course?: Course
   onDragStart: () => void
-  onDragEnd: () => void
+  onDragMove: (e: unknown, info: PanInfo) => void
+  onDrop: (e: unknown, info: PanInfo) => void
   onPick: () => void
   onToggle: () => void
 }) {
@@ -216,16 +276,18 @@ function PlannerChip({
   return (
     <motion.div
       layout
+      drag
+      dragSnapToOrigin
+      dragMomentum={false}
+      dragElastic={0.12}
+      onDragStart={onDragStart}
+      onDrag={onDragMove}
+      onDragEnd={onDrop}
+      whileDrag={{ scale: 1.06, zIndex: 50, cursor: 'grabbing' }}
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      draggable
-      onDragStart={(e) => {
-        ;(e as unknown as DragEvent).dataTransfer?.setData('text/task-id', task.id)
-        onDragStart()
-      }}
-      onDragEnd={onDragEnd}
-      className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-right lg:cursor-grab lg:active:cursor-grabbing ${
+      className={`relative flex touch-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-right shadow-sm ${
         pinned ? 'border' : 'border border-dashed'
       }`}
       style={{
@@ -240,7 +302,7 @@ function PlannerChip({
           task.done ? 'border-primary bg-primary' : 'border-line'
         }`}
       />
-      <button onClick={onPick} className="min-w-0 flex-1 text-right">
+      <button onClick={onPick} className="min-w-0 flex-1 cursor-grab text-right active:cursor-grabbing">
         <span className="block truncate text-[11px] font-semibold leading-tight text-ink">{task.title}</span>
         <span className="block truncate text-[10px] text-muted">
           {course?.emoji} {formatDuration(task.minutes)}
@@ -250,7 +312,7 @@ function PlannerChip({
   )
 }
 
-/** Mobile equivalent of dragging: pick the target day from a list. */
+/** Tap-to-assign: the smaller target on a phone, and the keyboard path. */
 function DayPicker({
   task,
   days,

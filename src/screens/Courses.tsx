@@ -137,7 +137,6 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
   const { tasks, exams, toggleTask, removeTask, addTask, updateTask, removeCourse } = useStore()
   const [title, setTitle] = useState('')
   const [minutes, setMinutes] = useState(60)
-  const [dueDate, setDueDate] = useState('')
   // Editing reuses the same inline form rather than opening a second sheet on
   // top of this one — nested bottom sheets are awkward to dismiss on mobile.
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -153,7 +152,6 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
   const reset = () => {
     setEditingId(null)
     setTitle('')
-    setDueDate('')
     setMinutes(60)
   }
 
@@ -163,12 +161,14 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
     setEditingId(id)
     setTitle(t.title)
     setMinutes(t.minutes)
-    setDueDate(t.dueDate ?? '')
   }
 
+  // A task is created without a day and is auto-scheduled; the week planner is
+  // the only place that pins one. dueDate is deliberately absent from the patch
+  // so editing a task's title or length never unpins the day it was given.
   const submit = () => {
     if (!course || !title.trim()) return
-    const fields = { title: title.trim(), minutes, dueDate: dueDate || undefined }
+    const fields = { title: title.trim(), minutes }
     if (editingId) updateTask(editingId, fields)
     else addTask({ courseId: course.id, ...fields })
     reset()
@@ -211,33 +211,17 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
                 placeholder="למשל: לפתור תרגיל 5"
               />
             </Field>
-            <div className="flex gap-3">
-              <Field label="כמה זמן?">
-                <select
-                  className={inputClass}
-                  value={minutes}
-                  onChange={(e) => setMinutes(Number(e.target.value))}
-                >
-                  {DURATION_OPTIONS_MIN.map((m) => (
-                    <option key={m} value={m}>
-                      {formatDuration(m)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="שיוך ליום (רשות)">
-                <input
-                  type="date"
-                  className={inputClass}
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
-              </Field>
-            </div>
+            <Field label="כמה זמן?">
+              <select className={inputClass} value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
+                {DURATION_OPTIONS_MIN.map((m) => (
+                  <option key={m} value={m}>
+                    {formatDuration(m)}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <p className="mb-3 -mt-1 text-xs text-muted">
-              {dueDate
-                ? 'המשימה תופיע ביום שבחרת.'
-                : 'בלי יום נבחר, המשימה תשובץ אוטומטית לפני המבחן הקרוב.'}
+              המשימה תשובץ אוטומטית לפני המבחן הקרוב. לקיבוע ליום מסוים — טאב "תכנון שבוע".
             </p>
             <PrimaryButton onClick={submit}>{editingId ? 'שמור שינויים' : 'הוסף משימה'}</PrimaryButton>
             {editingId && (

@@ -89,6 +89,49 @@ export function Card({ className = '', children }: { className?: string; childre
   return <div className={`rounded-2xl bg-surface shadow-card ${className}`}>{children}</div>
 }
 
+/* ---------- Course visibility filter ---------- */
+/** Google-Calendar style "which calendars to show" row. Purely a display
+ *  filter — the schedule is always computed from every task, so hiding a
+ *  course never changes where anything is scheduled. */
+export function CourseFilter({
+  courses,
+  hidden,
+  onToggle,
+}: {
+  courses: Course[]
+  hidden: Set<string>
+  onToggle: (next: Set<string>) => void
+}) {
+  if (courses.length === 0) return null
+  const flip = (id: string) => {
+    const next = new Set(hidden)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    onToggle(next)
+  }
+  return (
+    <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0">
+      {courses.map((c) => {
+        const on = !hidden.has(c.id)
+        return (
+          <button
+            key={c.id}
+            onClick={() => flip(c.id)}
+            aria-pressed={on}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-line transition-all ${
+              on ? '' : 'opacity-40'
+            }`}
+            style={{ backgroundColor: on ? c.color + '1a' : 'transparent' }}
+          >
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} />
+            {c.emoji} {c.name}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ---------- Task row ---------- */
 export function TaskRow({
   task,
@@ -97,7 +140,6 @@ export function TaskRow({
   onEdit,
   onDelete,
   flat = false,
-  draggable = false,
 }: {
   task: Task
   course?: Course
@@ -106,8 +148,6 @@ export function TaskRow({
   onDelete?: () => void
   /** Renders as a plain row (for lists inside one Card with dividers) instead of a standalone card. */
   flat?: boolean
-  /** Desktop week planner: makes the row a drag source carrying the task id. */
-  draggable?: boolean
 }) {
   return (
     <motion.div
@@ -115,15 +155,11 @@ export function TaskRow({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-      draggable={draggable || undefined}
-      onDragStart={
-        draggable ? (e) => (e as unknown as DragEvent).dataTransfer?.setData('text/task-id', task.id) : undefined
-      }
-      className={`${
+      className={
         flat
           ? 'flex items-center gap-3 px-1 py-3'
           : 'flex items-center gap-3 rounded-2xl bg-surface px-3.5 py-3 shadow-card transition-shadow hover:shadow-lg'
-      } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      }
     >
       <span
         aria-hidden

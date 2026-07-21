@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { House, CalendarBlank, BookOpen, User } from '@phosphor-icons/react'
+import { House, CalendarBlank, BookOpen, User, Kanban } from '@phosphor-icons/react'
 import type { User as FirebaseUser } from 'firebase/auth'
 import Home from './screens/Home'
+import WeekPlanner from './screens/WeekPlanner'
 import CalendarScreen from './screens/CalendarScreen'
 import Courses from './screens/Courses'
 import Profile from './screens/Profile'
@@ -11,11 +12,13 @@ import { CanopyMark } from './ui'
 import { isConfigured } from './firebaseConfig'
 import { useAuth, useCloudSync } from './cloud'
 
+// `short` is the mobile dock label — five tabs leave little room on a phone.
 const TABS = [
-  { key: 'home', label: 'בית', Icon: House, Screen: Home },
-  { key: 'schedule', label: 'לוח זמנים', Icon: CalendarBlank, Screen: CalendarScreen },
-  { key: 'courses', label: 'קורסים', Icon: BookOpen, Screen: Courses },
-  { key: 'profile', label: 'פרופיל', Icon: User, Screen: Profile },
+  { key: 'home', label: 'בית', short: 'בית', Icon: House, Screen: Home },
+  { key: 'plan', label: 'תכנון שבוע', short: 'תכנון', Icon: Kanban, Screen: WeekPlanner },
+  { key: 'schedule', label: 'לוח זמנים', short: 'לו״ז', Icon: CalendarBlank, Screen: CalendarScreen },
+  { key: 'courses', label: 'קורסים', short: 'קורסים', Icon: BookOpen, Screen: Courses },
+  { key: 'profile', label: 'פרופיל', short: 'פרופיל', Icon: User, Screen: Profile },
 ] as const
 
 export default function App() {
@@ -100,8 +103,8 @@ function MainApp({ user }: { user: FirebaseUser }) {
 
       {/* Mobile floating dock */}
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:max-w-2xl lg:hidden">
-        <div className="grid grid-cols-4 rounded-2xl bg-surface/95 p-1.5 shadow-card backdrop-blur-lg">
-          {TABS.map(({ key, label, Icon }) => {
+        <div className="grid grid-cols-5 rounded-2xl bg-surface/95 p-1 shadow-card backdrop-blur-lg">
+          {TABS.map(({ key, short, Icon }) => {
             const on = key === tab
             return (
               <button
@@ -119,15 +122,15 @@ function MainApp({ user }: { user: FirebaseUser }) {
                 )}
                 <Icon
                   weight={on ? 'fill' : 'regular'}
-                  size={22}
+                  size={21}
                   className={`relative z-10 transition-colors ${on ? 'text-primary' : 'text-muted'}`}
                 />
                 <span
-                  className={`relative z-10 text-[11px] transition-colors ${
+                  className={`relative z-10 text-[10px] transition-colors ${
                     on ? 'font-semibold text-primary' : 'text-muted'
                   }`}
                 >
-                  {label}
+                  {short}
                 </span>
               </button>
             )
