@@ -248,7 +248,7 @@ function CourseDetail({
               </select>
             </Field>
             <p className="mb-3 -mt-1 text-xs text-muted">
-              המשימה תשובץ אוטומטית לפני המבחן הקרוב. לקיבוע ליום מסוים — טאב "תכנון שבוע".
+              המשימה תיכנס למאגר בטאב "תכנון שבוע", שם תוכל לגרור אותה ליום.
             </p>
             <PrimaryButton onClick={submit}>{editingId ? 'שמור שינויים' : 'הוסף משימה'}</PrimaryButton>
             {editingId && (

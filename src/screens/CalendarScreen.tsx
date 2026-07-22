@@ -10,8 +10,7 @@ import { Sheet, TaskRow, Field, inputClass, PrimaryButton, RowMenu, CourseFilter
 const WEEKDAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
 
 export default function CalendarScreen() {
-  const { tasks, exams, courses, dailyCap, toggleTask, addExam, updateExam, removeExam, restore } =
-    useStore()
+  const { tasks, exams, courses, toggleTask, addExam, updateExam, removeExam, restore } = useStore()
   const today = todayIso()
   const now = new Date()
   const [editingExam, setEditingExam] = useState<Exam | null>(null)
@@ -25,8 +24,8 @@ export default function CalendarScreen() {
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
   const schedule = useMemo(
-    () => buildSchedule(tasks, exams, today, dailyCap),
-    [tasks, exams, today, dailyCap],
+    () => buildSchedule(tasks, today),
+    [tasks, today],
   )
   const examsByDay = useMemo(() => {
     const m = new Map<string, Exam[]>()

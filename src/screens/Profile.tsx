@@ -20,7 +20,7 @@ export default function Profile() {
 
   const exportCalendar = () => {
     const today = todayIso()
-    const schedule = buildSchedule(tasks, exams, today, dailyCap)
+    const schedule = buildSchedule(tasks, today)
     // DTSTAMP must be a UTC timestamp, unlike the all-day dates in the events.
     const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
     downloadIcs(buildIcs(exams, schedule, courses, now))
@@ -60,7 +60,7 @@ export default function Profile() {
       </Card>
 
       <Card className="p-4">
-        <Field label="כמה זמן ללמוד ביום (משמש לשיבוץ האוטומטי)">
+        <Field label="כמה זמן ללמוד ביום">
           <select
             className={inputClass}
             value={dailyCap}
@@ -74,7 +74,8 @@ export default function Profile() {
           </select>
         </Field>
         <p className="text-xs text-muted">
-          משימות בלי יום מוגדר יתפרסו על הימים שלפני המבחן, עד למכסה הזו בכל יום.
+          בתכנון השבוע, יום שחורג מהמכסה הזו יסומן כעמוס. השיבוץ עצמו תמיד שלך — שום משימה לא
+          משובצת אוטומטית.
         </p>
       </Card>
 

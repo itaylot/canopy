@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, type PanInfo } from 'motion/react'
-import { CaretRight, CaretLeft, Sparkle } from '@phosphor-icons/react'
+import { CaretRight, CaretLeft, ArrowUUpLeft, Tray } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
-import { buildSchedule } from '../schedule'
+import { buildSchedule, unscheduled, dayLoad } from '../schedule'
 import { zoneAt, POOL, type Zone } from '../planner'
 import {
   todayIso,
@@ -21,10 +21,10 @@ const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמיש�
 /**
  * Week planning: the screen where a task gets its day.
  *
- * Dragging uses Motion's pointer-based drag rather than HTML5 drag-and-drop,
- * which does not exist on touch devices at all — and this app is used on a
- * phone. One mechanism covers mouse and touch, and it survives the chip being
- * covered by buttons, which native dragging does not reliably do.
+ * Nothing is scheduled automatically. A new task lands in the pool and stays
+ * there until it is dragged onto a day; dragging it back to the pool unschedules
+ * it again. Dragging uses Motion's pointer-based drag rather than HTML5
+ * drag-and-drop, which does not exist on touch devices at all.
  */
 export default function WeekPlanner() {
   const { tasks, exams, courses, dailyCap, toggleTask, setTaskDay } = useStore()
@@ -36,10 +36,7 @@ export default function WeekPlanner() {
   const [picking, setPicking] = useState<Task | null>(null)
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
-  const schedule = useMemo(
-    () => buildSchedule(tasks, exams, today, dailyCap),
-    [tasks, exams, today, dailyCap],
-  )
+  const schedule = useMemo(() => buildSchedule(tasks, today), [tasks, today])
   const examsByDay = useMemo(() => {
     const m = new Map<string, typeof exams>()
     exams.forEach((e) => {
@@ -54,14 +51,15 @@ export default function WeekPlanner() {
     [weekStart],
   )
 
-  // The pool holds pending tasks the scheduler placed outside the week on
-  // screen — the ones you'd want to pull in. Tasks already inside the week
-  // live in their day column instead of being listed twice.
+  // Everything still waiting for a day, grouped by course so a long list stays
+  // navigable. Courses with nothing waiting are left out entirely.
   const pool = useMemo(() => {
-    const insideWeek = new Set<string>()
-    for (const d of days) for (const t of schedule[d] ?? []) insideWeek.add(t.id)
-    return tasks.filter((t) => !t.done && !insideWeek.has(t.id) && !hidden.has(t.courseId))
-  }, [tasks, schedule, days, hidden])
+    const waiting = unscheduled(tasks).filter((t) => !hidden.has(t.courseId))
+    return courses
+      .map((course) => ({ course, items: waiting.filter((t) => t.courseId === course.id) }))
+      .filter((g) => g.items.length > 0)
+  }, [tasks, courses, hidden])
+  const poolCount = pool.reduce((n, g) => n + g.items.length, 0)
 
   // Drop targets register themselves so the hit test needs no DOM queries.
   const zoneEls = useRef(new Map<string, HTMLElement>())
@@ -82,9 +80,8 @@ export default function WeekPlanner() {
       }
     })
 
-  const onDragMove = (_: unknown, info: PanInfo) => {
+  const onDragMove = (_: unknown, info: PanInfo) =>
     setHovered(zoneAt(info.point.x, info.point.y, zones()))
-  }
 
   const onDrop = (task: Task) => (_: unknown, info: PanInfo) => {
     const key = zoneAt(info.point.x, info.point.y, zones())
@@ -98,9 +95,7 @@ export default function WeekPlanner() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink">תכנון שבוע</h1>
-      </div>
+      <h1 className="text-2xl font-bold text-ink">תכנון שבוע</h1>
 
       <CourseFilter courses={courses} hidden={hidden} onToggle={setHidden} />
 
@@ -125,7 +120,7 @@ export default function WeekPlanner() {
       </div>
 
       <p className="px-1 text-xs text-muted">
-        גרור משימה ליום כדי לקבע אותה שם, או הקש עליה כדי לבחור יום מרשימה.
+        גרור משימה מהמאגר ליום, או בחזרה למאגר. אפשר גם להקיש על משימה ולבחור.
       </p>
 
       <div className="grid gap-2.5 lg:grid-cols-7 lg:items-start">
@@ -135,6 +130,7 @@ export default function WeekPlanner() {
           const isToday = iso === today
           const isPast = iso < today
           const isTarget = hovered === iso
+          const load = dayLoad(dayTasks)
           return (
             <div
               key={iso}
@@ -152,6 +148,18 @@ export default function WeekPlanner() {
                 </span>
                 <span className="hidden text-[11px] tabular-nums text-muted lg:inline">{dayOfMonth(iso)}</span>
               </div>
+
+              {load > 0 && (
+                <p
+                  className={`mb-1.5 text-[10px] tabular-nums ${
+                    load > dailyCap ? 'font-semibold text-accent' : 'text-muted'
+                  }`}
+                  title={load > dailyCap ? 'מעבר למכסה היומית שהגדרת' : undefined}
+                >
+                  {formatDuration(load)}
+                  {load > dailyCap ? ' · עמוס' : ''}
+                </p>
+              )}
 
               {dayExams.map((e) => (
                 <div key={e.id} className="mb-1.5 rounded-lg bg-accent-soft px-2 py-1.5 text-[11px] font-medium text-ink">
@@ -191,35 +199,35 @@ export default function WeekPlanner() {
         }`}
       >
         <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-sm font-bold text-ink">מאגר משימות</h2>
-          <span className="text-[11px] text-muted">מחוץ לשבוע הזה</span>
+          <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink">
+            <Tray size={16} className="text-primary" /> מאגר משימות
+          </h2>
+          <span className="text-[11px] tabular-nums text-muted">
+            {poolCount > 0 ? `${poolCount} ממתינות לשיבוץ` : 'ריק'}
+          </span>
         </div>
-        {pool.length === 0 ? (
-          <p className="py-3 text-center text-xs text-muted">כל המשימות הממתינות משובצות בשבוע הזה.</p>
+
+        {poolCount === 0 ? (
+          <p className="py-3 text-center text-xs text-muted">
+            כל המשימות משובצות. משימות חדשות יופיעו כאן עד שתשבץ אותן.
+          </p>
         ) : (
-          <>
-            <p className="mb-2 text-[11px] text-muted">גרור לכאן כדי לבטל קיבוע ולהחזיר לשיבוץ אוטומטי.</p>
-            <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
-              {pool.map((t) => (
-                <PlannerChip
-                  key={t.id}
-                  task={t}
-                  course={courseById.get(t.courseId)}
-                  onDragStart={() => setDragging(t.id)}
-                  onDragMove={onDragMove}
-                  onDrop={onDrop(t)}
-                  onPick={() => setPicking(t)}
-                  onToggle={() => toggleTask(t.id)}
-                />
-              ))}
-            </div>
-          </>
+          <div className="space-y-1.5">
+            {pool.map(({ course, items }) => (
+              <CourseGroup
+                key={course.id}
+                course={course}
+                items={items}
+                onDragStart={setDragging}
+                onDragMove={onDragMove}
+                onDrop={onDrop}
+                onPick={setPicking}
+                onToggle={toggleTask}
+              />
+            ))}
+          </div>
         )}
       </div>
-
-      <p className="px-1 text-[11px] text-muted">
-        מסגרת מקווקוות = שובצה אוטומטית לפי המבחן הקרוב. גרירה מקבעת ליום שבחרת.
-      </p>
 
       <DayPicker
         task={picking}
@@ -232,6 +240,58 @@ export default function WeekPlanner() {
         }}
       />
     </div>
+  )
+}
+
+/** One collapsible course section inside the pool. */
+function CourseGroup({
+  course,
+  items,
+  onDragStart,
+  onDragMove,
+  onDrop,
+  onPick,
+  onToggle,
+}: {
+  course: Course
+  items: Task[]
+  onDragStart: (id: string) => void
+  onDragMove: (e: unknown, info: PanInfo) => void
+  onDrop: (t: Task) => (e: unknown, info: PanInfo) => void
+  onPick: (t: Task) => void
+  onToggle: (id: string) => void
+}) {
+  // <details> gives open/close, keyboard support and the disclosure semantics
+  // for free — a hand-rolled toggle would be more code and less accessible.
+  return (
+    <details open className="group rounded-xl border border-line/70 open:bg-bg/40">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl px-2.5 py-2 text-xs font-semibold text-ink transition-colors hover:bg-primary-soft/50">
+        <CaretLeft
+          size={13}
+          weight="bold"
+          className="shrink-0 text-muted transition-transform group-open:-rotate-90"
+        />
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: course.color }} />
+        <span className="min-w-0 flex-1 truncate">
+          {course.emoji} {course.name}
+        </span>
+        <span className="shrink-0 tabular-nums text-[11px] font-normal text-muted">{items.length}</span>
+      </summary>
+      <div className="grid gap-1.5 p-2 pt-0 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((t) => (
+          <PlannerChip
+            key={t.id}
+            task={t}
+            course={course}
+            onDragStart={() => onDragStart(t.id)}
+            onDragMove={onDragMove}
+            onDrop={onDrop(t)}
+            onPick={() => onPick(t)}
+            onToggle={() => onToggle(t.id)}
+          />
+        ))}
+      </div>
+    </details>
   )
 }
 
@@ -253,7 +313,6 @@ function PlannerChip({
   onPick: () => void
   onToggle: () => void
 }) {
-  const pinned = !!task.dueDate
   return (
     <motion.div
       layout
@@ -268,12 +327,10 @@ function PlannerChip({
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      className={`relative flex touch-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-right shadow-sm ${
-        pinned ? 'border' : 'border border-dashed'
-      }`}
+      className="relative flex touch-none items-center gap-1.5 rounded-lg border px-2 py-1.5 text-right shadow-sm"
       style={{
         backgroundColor: (course?.color ?? '#4C7B39') + '14',
-        borderColor: (course?.color ?? '#4C7B39') + (pinned ? '66' : '40'),
+        borderColor: (course?.color ?? '#4C7B39') + '66',
       }}
     >
       <button
@@ -285,8 +342,9 @@ function PlannerChip({
       />
       <button onClick={onPick} className="min-w-0 flex-1 cursor-grab text-right active:cursor-grabbing">
         <span className="block truncate text-[11px] font-semibold leading-tight text-ink">{task.title}</span>
-        <span className="block truncate text-[10px] text-muted">
-          {course?.emoji} {formatDuration(task.minutes)}
+        <span className="block truncate text-[10px] leading-tight text-muted">
+          {course ? `${course.name} · ` : ''}
+          {formatDuration(task.minutes)}
         </span>
       </button>
     </motion.div>
@@ -322,12 +380,15 @@ function DayPicker({
             {iso === today && <span className="text-xs text-muted">היום</span>}
           </button>
         ))}
-        <button
-          onClick={() => onPick(undefined)}
-          className="mt-2 flex w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-right text-muted transition-colors hover:text-ink"
-        >
-          <Sparkle size={16} /> שיבוץ אוטומטי (לפי המבחן הקרוב)
-        </button>
+        {/* Only offered for a task that actually has a day to give up. */}
+        {task?.dueDate && (
+          <button
+            onClick={() => onPick(undefined)}
+            className="mt-2 flex w-full items-center gap-2 rounded-xl border border-line px-4 py-3 text-right text-muted transition-colors hover:text-ink"
+          >
+            <ArrowUUpLeft size={16} /> החזר למאגר
+          </button>
+        )}
       </div>
     </Sheet>
   )

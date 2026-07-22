@@ -28,13 +28,13 @@ import { CanopyScene } from '../CanopyScene'
 import { auth } from '../firebase'
 
 export default function Home() {
-  const { tasks, exams, courses, dailyCap, toggleTask } = useStore()
+  const { tasks, exams, courses, toggleTask } = useStore()
   const today = todayIso()
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
 
   const schedule = useMemo(
-    () => buildSchedule(tasks, exams, today, dailyCap),
-    [tasks, exams, today, dailyCap],
+    () => buildSchedule(tasks, today),
+    [tasks, today],
   )
   const pendingToday = schedule[today] ?? []
   const doneToday = tasks.filter((t) => t.done && t.completedAt === today)

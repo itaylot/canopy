@@ -6,41 +6,50 @@
 // passed — the checks were testing their own copy. Import only from modules
 // with no JSX and no browser APIs.
 import assert from 'node:assert/strict'
-import { buildSchedule } from './src/schedule.ts'
-import { addDaysIso, isoLt, isoLte, examLabel } from './src/utils.ts'
+import { buildSchedule, unscheduled, dayLoad } from './src/schedule.ts'
+import { addDaysIso, examLabel } from './src/utils.ts'
 import { zoneAt } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
 
 const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
 
-// 1. A task assigned to today lands on today.
-let s = buildSchedule([task('a', 'c1', 30, { dueDate: T })], [], T, 180)
+// 1. A task placed on a day lands on that day.
+let s = buildSchedule([task('a', 'c1', 30, { dueDate: T })], T)
 assert.deepEqual(s[T].map((t) => t.id), ['a'])
 
 // 2. Done tasks are ignored.
-s = buildSchedule([task('a', 'c1', 30, { done: true, dueDate: T })], [], T, 180)
+s = buildSchedule([task('a', 'c1', 30, { done: true, dueDate: T })], T)
 assert.equal(Object.keys(s).length, 0)
 
-// 3. A fixed day assignment ignores the daily cap entirely (both land on today).
-s = buildSchedule([task('a', 'c1', 120, { dueDate: T }), task('b', 'c1', 120, { dueDate: T })], [], T, 180)
+// 3. A day holds however much the user put there — no cap moves anything.
+s = buildSchedule([task('a', 'c1', 120, { dueDate: T }), task('b', 'c1', 120, { dueDate: T })], T)
 assert.deepEqual(s[T].map((t) => t.id).sort(), ['a', 'b'])
 
-// 4. Auto-distributed (no dueDate) tasks spill past the cap to the next day.
-s = buildSchedule([task('a', 'c1', 120), task('b', 'c1', 120)], [], T, 180)
-assert.equal(s[T].length, 1)
-assert.equal(s[addDaysIso(T, 1)].length, 1)
+// 4. NOTHING is scheduled automatically. A task with no day is not placed on
+//    any day — it waits in the pool. This is what makes "drag back to the pool"
+//    possible at all: the scheduler used to put such a task straight back onto
+//    a day, so returning one to the pool looked like the drag had failed.
+s = buildSchedule([task('a', 'c1', 120), task('b', 'c1', 120)], T)
+assert.deepEqual(s, {}, 'undated tasks are not placed anywhere')
 
-// 5. Auto-distributed tasks never land on/after the exam day (buffer = day before).
-const exam = { id: 'e', courseId: 'c1', title: 'x', date: addDaysIso(T, 3) }
-s = buildSchedule([task('a', 'c1', 500)], [exam], T, 180) // huge task, must clamp to buffer day
-const scheduledDay = Object.keys(s)[0]
-assert.ok(isoLt(scheduledDay, exam.date), 'scheduled before exam day')
-assert.ok(isoLte(scheduledDay, addDaysIso(exam.date, -1)), 'no later than buffer day')
+// 5. Those same tasks are exactly what the pool shows, and completed ones are
+//    not offered for scheduling.
+const waiting = unscheduled([
+  task('a', 'c1', 60),
+  task('b', 'c1', 60, { dueDate: T }),
+  task('c', 'c1', 60, { done: true }),
+])
+assert.deepEqual(waiting.map((t) => t.id), ['a'])
 
-// 6. A fixed assignment in the past is pulled up to today (missed tasks resurface).
-s = buildSchedule([task('a', 'c1', 30, { dueDate: addDaysIso(T, -5) })], [], T, 180)
+// 6. A day that has passed and is still not done resurfaces on today, rather
+//    than staying somewhere nobody looks.
+s = buildSchedule([task('a', 'c1', 30, { dueDate: addDaysIso(T, -5) })], T)
 assert.deepEqual(s[T].map((t) => t.id), ['a'])
+
+// 6b. Day load drives the "overloaded" badge.
+assert.equal(dayLoad([task('a', 'c1', 90), task('b', 'c1', 60)]), 150)
+assert.equal(dayLoad([]), 0)
 
 
 /* ---------------------------------------------------------------------------
@@ -237,4 +246,4 @@ assert.equal(
   'unrelated edit survives the undo',
 )
 
-console.log('schedule.check.mjs: all 22 checks passed ✓')
+console.log('schedule.check.mjs: all 23 checks passed ✓')

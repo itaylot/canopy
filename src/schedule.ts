@@ -1,75 +1,35 @@
-import type { Task, Exam } from './store'
+import type { Task } from './store'
 // Explicit .ts extension so plain Node can import this module for the self-check
 // (schedule.check.mjs) without a build step. Vite resolves it identically.
-import { addDaysIso, isoLt, isoLte } from './utils.ts'
+import { isoLt } from './utils.ts'
 
 export type DaySchedule = Record<string, Task[]> // isoDate -> tasks planned that day
 
-// Pure. Given the pending tasks + exams, decides which day each task lands on.
-//   - task.dueDate set   -> fixed assignment: always that day (pulled to today if it's
-//                           already past), exactly like putting an event on a calendar.
-//   - task.dueDate unset -> auto-distributed: greedily filled from today, spilling to
-//                           the next day once `dailyCap` minutes are used, clamped to a
-//                           buffer day before the course's next exam if it has one.
-export function buildSchedule(
-  tasks: Task[],
-  exams: Exam[],
-  today: string,
-  dailyCap: number,
-): DaySchedule {
-  const pending = tasks.filter((t) => !t.done)
+/**
+ * Pure. Groups the pending tasks onto the days the user put them on.
+ *
+ * Scheduling is entirely manual: a task has a day because someone dragged it
+ * onto one in the week planner. Tasks without a day are not placed anywhere —
+ * they wait in the planner's pool. An earlier version distributed them
+ * automatically before the next exam, which meant returning a task to the pool
+ * was impossible: the scheduler put it straight back onto a day.
+ *
+ * The one thing it still decides on its own: a task whose day has already
+ * passed and is still not done resurfaces on today, rather than staying in the
+ * past where nobody would look at it again.
+ */
+export function buildSchedule(tasks: Task[], today: string): DaySchedule {
   const byDay: DaySchedule = {}
-  const load: Record<string, number> = {}
-
-  const assign = (day: string, task: Task) => {
-    load[day] = (load[day] ?? 0) + task.minutes
+  for (const task of tasks) {
+    if (task.done || !task.dueDate) continue
+    const day = isoLt(task.dueDate, today) ? today : task.dueDate
     ;(byDay[day] ??= []).push(task)
   }
-
-  const fixed = pending.filter((t) => t.dueDate)
-  const auto = pending.filter((t) => !t.dueDate)
-
-  for (const task of fixed) {
-    assign(isoLt(task.dueDate!, today) ? today : task.dueDate!, task)
-  }
-
-  const nextExamDate = (courseId: string): string | null => {
-    const upcoming = exams
-      .filter((e) => e.courseId === courseId && isoLte(today, e.date))
-      .map((e) => e.date)
-      .sort()
-    return upcoming[0] ?? null
-  }
-
-  const items = auto.map((task) => {
-    const exam = nextExamDate(task.courseId)
-    let deadline: string | null = null
-    if (exam) {
-      deadline = addDaysIso(exam, -1)
-      if (isoLt(deadline, today)) deadline = today
-    }
-    return { task, deadline }
-  })
-
-  // Earliest deadline first (no-deadline last); tie-break longer tasks first.
-  items.sort((a, b) => {
-    if (a.deadline && b.deadline) {
-      if (a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1
-      return b.task.minutes - a.task.minutes
-    }
-    if (a.deadline) return -1
-    if (b.deadline) return 1
-    return b.task.minutes - a.task.minutes
-  })
-
-  for (const { task, deadline } of items) {
-    let day = today
-    while ((load[day] ?? 0) + task.minutes > dailyCap && (!deadline || isoLt(day, deadline))) {
-      day = addDaysIso(day, 1)
-    }
-    if (deadline && isoLt(deadline, day)) day = deadline
-    assign(day, task)
-  }
-
   return byDay
 }
+
+/** Tasks waiting to be scheduled — the week planner's pool. */
+export const unscheduled = (tasks: Task[]) => tasks.filter((t) => !t.done && !t.dueDate)
+
+/** Total planned minutes for a day, used to flag an overloaded day. */
+export const dayLoad = (tasks: Task[]) => tasks.reduce((sum, t) => sum + t.minutes, 0)
