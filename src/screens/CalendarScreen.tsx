@@ -4,12 +4,14 @@ import { CaretRight, CaretLeft, Plus } from '@phosphor-icons/react'
 import { useStore, type Course, type Exam, type Task } from '../store'
 import { buildSchedule } from '../schedule'
 import { todayIso, toIso, monthLabel, formatHe, examLabel } from '../utils'
+import { toast } from '../toast'
 import { Sheet, TaskRow, Field, inputClass, PrimaryButton, RowMenu, CourseFilter } from '../ui'
 
 const WEEKDAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
 
 export default function CalendarScreen() {
-  const { tasks, exams, courses, dailyCap, toggleTask, addExam, updateExam, removeExam } = useStore()
+  const { tasks, exams, courses, dailyCap, toggleTask, addExam, updateExam, removeExam, restore } =
+    useStore()
   const today = todayIso()
   const now = new Date()
   const [editingExam, setEditingExam] = useState<Exam | null>(null)
@@ -152,7 +154,13 @@ export default function CalendarScreen() {
           setSelected(null)
           setEditingExam(e)
         }}
-        onDeleteExam={removeExam}
+        onDeleteExam={(e) => {
+          removeExam(e.id)
+          toast(`המבחן "${examLabel(e.title, courseById.get(e.courseId)?.name)}" נמחק.`, {
+            actionLabel: 'ביטול',
+            onAction: () => restore({ exams: [e] }),
+          })
+        }}
         courseById={courseById}
       />
       <ExamForm open={addingExam} onClose={() => setAddingExam(false)} onSubmit={addExam} />
@@ -182,7 +190,7 @@ function DaySheet({
   exams: Exam[]
   onToggle: (id: string) => void
   onEditExam: (e: Exam) => void
-  onDeleteExam: (id: string) => void
+  onDeleteExam: (e: Exam) => void
   courseById: Map<string, Course>
 }) {
   return (
@@ -199,7 +207,7 @@ function DaySheet({
                   · {c?.emoji} {c?.name}
                 </span>
               </span>
-              <RowMenu onEdit={() => onEditExam(e)} onDelete={() => onDeleteExam(e.id)} />
+              <RowMenu onEdit={() => onEditExam(e)} onDelete={() => onDeleteExam(e)} />
             </div>
           )
         })}

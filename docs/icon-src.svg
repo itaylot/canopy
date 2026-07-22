@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Source for the PWA/home-screen icons. The mark is the in-app CanopyMark
+       (src/ui.tsx) in palette v3, scaled to sit inside the central 60% so it
+       survives Android's maskable crop, which can cut away the outer ~20%. -->
+  <rect width="512" height="512" fill="#f7f6ec" />
+  <g transform="translate(116 155) scale(7)">
+    <rect x="7" y="14" width="2.4" height="10" rx="1" fill="#714f21" />
+    <circle cx="8.2" cy="10" r="7.2" fill="#4c7b39" />
+    <rect x="30.4" y="17" width="2.2" height="7" rx="1" fill="#714f21" />
+    <circle cx="31.5" cy="14.4" r="5.4" fill="#88a431" />
+    <path d="M9 11.5 Q20 16 31 15" stroke="#b88a3e" stroke-width="1.4" stroke-linecap="round" fill="none" />
+    <line x1="18.5" y1="13.7" x2="18.5" y2="17" stroke="#b88a3e" stroke-width="1.1" />
+    <circle cx="18.5" cy="18.3" r="1.7" fill="#b88a3e" />
+  </g>
+</svg>

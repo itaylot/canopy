@@ -3,6 +3,7 @@ import { AnimatePresence, motion, type PanInfo } from 'motion/react'
 import { CaretRight, CaretLeft, Sparkle } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
 import { buildSchedule } from '../schedule'
+import { zoneAt, POOL, type Zone } from '../planner'
 import {
   todayIso,
   addDaysIso,
@@ -16,26 +17,6 @@ import {
 import { Sheet, CourseFilter } from '../ui'
 
 const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
-
-/** A drop target: the day it stands for, plus where it sits on the page. */
-export type Zone = { key: string; left: number; top: number; right: number; bottom: number }
-
-/**
- * Which drop zone a released chip landed on, or null if it was dropped in
- * open space (the chip then springs back and nothing changes).
- *
- * Pure and in page coordinates on purpose: Motion reports the pointer as
- * pageX/pageY while getBoundingClientRect() is viewport-relative, so the
- * caller adds scroll offset once, here, rather than everywhere.
- */
-export function zoneAt(x: number, y: number, zones: Zone[]): string | null {
-  for (const z of zones) {
-    if (x >= z.left && x <= z.right && y >= z.top && y <= z.bottom) return z.key
-  }
-  return null
-}
-
-const POOL = 'pool'
 
 /**
  * Week planning: the screen where a task gets its day.

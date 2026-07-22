@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { todayIso } from './utils'
+// Explicit .ts extension so plain Node can import this for the self-check.
+import { todayIso } from './utils.ts'
 
 export type Course = { id: string; name: string; emoji: string; color: string }
 export type Task = {
@@ -42,7 +43,28 @@ type State = {
   updateExam: (id: string, patch: Partial<Exam>) => void
   removeExam: (id: string) => void
   setDailyCap: (n: number) => void
+  /** Puts deleted rows back — see captureCourse and the undo toasts. */
+  restore: (payload: Restorable) => void
   replaceAll: (s: Pick<State, 'courses' | 'tasks' | 'exams' | 'dailyCap' | 'scene'>) => void
+}
+
+export type Restorable = { courses?: Course[]; tasks?: Task[]; exams?: Exam[] }
+
+/**
+ * Everything that deleting this course would take with it.
+ *
+ * Deleting a course cascades to its tasks and its exams, so undo has to put all
+ * three back. Capture this BEFORE calling removeCourse — afterwards it's gone.
+ * Only the removed rows are captured, not a whole-state snapshot, so undoing a
+ * delete can't also revert edits made while the toast was on screen.
+ */
+export function captureCourse(id: string): Restorable {
+  const s = useStore.getState()
+  return {
+    courses: s.courses.filter((c) => c.id === id),
+    tasks: s.tasks.filter((t) => t.courseId === id),
+    exams: s.exams.filter((e) => e.courseId === id),
+  }
 }
 
 const uid = () => crypto.randomUUID()
@@ -81,5 +103,18 @@ export const useStore = create<State>()((set) => ({
     set((s) => ({ exams: s.exams.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
   removeExam: (id) => set((s) => ({ exams: s.exams.filter((e) => e.id !== id) })),
   setDailyCap: (n) => set({ dailyCap: n }),
+  // Skips rows that already exist, so a double-tap on "ביטול" can't duplicate them.
+  restore: ({ courses = [], tasks = [], exams = [] }) =>
+    set((s) => {
+      const missing = <T extends { id: string }>(existing: T[], incoming: T[]) => {
+        const have = new Set(existing.map((x) => x.id))
+        return incoming.filter((x) => !have.has(x.id))
+      }
+      return {
+        courses: [...s.courses, ...missing(s.courses, courses)],
+        tasks: [...s.tasks, ...missing(s.tasks, tasks)],
+        exams: [...s.exams, ...missing(s.exams, exams)],
+      }
+    }),
   replaceAll: (s) => set(s),
 }))

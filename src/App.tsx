@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { House, CalendarBlank, BookOpen, User, Kanban } from '@phosphor-icons/react'
 import type { User as FirebaseUser } from 'firebase/auth'
@@ -8,9 +8,11 @@ import CalendarScreen from './screens/CalendarScreen'
 import Courses from './screens/Courses'
 import Profile from './screens/Profile'
 import Login from './screens/Login'
-import { CanopyMark } from './ui'
+import { CanopyMark, Toaster } from './ui'
 import { isConfigured } from './firebaseConfig'
 import { useAuth, useCloudSync } from './cloud'
+import { registerSW, applyUpdate } from './registerSW'
+import { toast } from './toast'
 
 // `short` is the mobile dock label — five tabs leave little room on a phone.
 const TABS = [
@@ -25,10 +27,27 @@ export default function App() {
   const { user, loading } = useAuth()
   useCloudSync(user)
 
-  if (!isConfigured) return <ConfigNeeded />
-  if (loading) return <Splash />
-  if (!user) return <Login />
-  return <MainApp user={user} />
+  useEffect(() => {
+    registerSW(() =>
+      toast('גרסה חדשה זמינה.', { actionLabel: 'רענן', onAction: applyUpdate, duration: 0 }),
+    )
+  }, [])
+
+  return (
+    <>
+      {!isConfigured ? (
+        <ConfigNeeded />
+      ) : loading ? (
+        <Splash />
+      ) : !user ? (
+        <Login />
+      ) : (
+        <MainApp user={user} />
+      )}
+      {/* Outside the auth branches: a sync failure has to be visible on every screen. */}
+      <Toaster />
+    </>
+  )
 }
 
 function MainApp({ user }: { user: FirebaseUser }) {

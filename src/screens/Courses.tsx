@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Plus, Trash } from '@phosphor-icons/react'
-import { useStore, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
+import { useStore, captureCourse, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
+import { toast } from '../toast'
 import {
   todayIso,
   formatHeShort,
@@ -13,7 +14,7 @@ import {
 import { Sheet, TaskRow, Field, inputClass, PrimaryButton, Card, RowMenu } from '../ui'
 
 export default function Courses() {
-  const { courses, tasks, exams, addCourse, updateCourse, removeCourse } = useStore()
+  const { courses, tasks, exams, addCourse, updateCourse, removeCourse, restore } = useStore()
   const today = todayIso()
   const [open, setOpen] = useState<Course | null>(null)
   const [adding, setAdding] = useState(false)
@@ -27,6 +28,20 @@ export default function Courses() {
       .filter((e) => e.courseId === courseId && e.date >= today)
       .sort((a, b) => (a.date < b.date ? -1 : 1))[0]
     return { total: list.length, done, minutesLeft, exam }
+  }
+
+  // Deleting a course takes its tasks and exams with it, so the undo has to be
+  // real rather than a confirm dialog — those train people to click "yes".
+  const deleteCourse = (c: Course) => {
+    const undo = captureCourse(c.id)
+    const n = undo.tasks?.length ?? 0
+    removeCourse(c.id)
+    setOpen(null)
+    toast(n > 0 ? `"${c.name}" נמחק, כולל ${n} משימות.` : `"${c.name}" נמחק.`, {
+      actionLabel: 'ביטול',
+      onAction: () => restore(undo),
+      duration: 8000,
+    })
   }
 
   const overall = useMemo(() => {
@@ -89,7 +104,7 @@ export default function Courses() {
                     {relativeDaysHe(today, exam.date)}
                   </span>
                 )}
-                <RowMenu onEdit={() => setEditingCourse(c)} onDelete={() => removeCourse(c.id)} />
+                <RowMenu onEdit={() => setEditingCourse(c)} onDelete={() => deleteCourse(c)} />
               </div>
               <div className="h-1.5 w-full bg-line/60">
                 <motion.div
@@ -112,7 +127,7 @@ export default function Courses() {
         )}
       </div>
 
-      <CourseDetail course={open} onClose={() => setOpen(null)} />
+      <CourseDetail course={open} onClose={() => setOpen(null)} onDeleteCourse={deleteCourse} />
       <CourseForm open={adding} onClose={() => setAdding(false)} onSubmit={addCourse} />
       <CourseForm
         open={!!editingCourse}
@@ -133,8 +148,16 @@ function Summary({ value, label }: { value: string; label: string }) {
   )
 }
 
-function CourseDetail({ course, onClose }: { course: Course | null; onClose: () => void }) {
-  const { tasks, exams, toggleTask, removeTask, addTask, updateTask, removeCourse } = useStore()
+function CourseDetail({
+  course,
+  onClose,
+  onDeleteCourse,
+}: {
+  course: Course | null
+  onClose: () => void
+  onDeleteCourse: (c: Course) => void
+}) {
+  const { tasks, exams, toggleTask, removeTask, addTask, updateTask, restore } = useStore()
   const [title, setTitle] = useState('')
   const [minutes, setMinutes] = useState(60)
   // Editing reuses the same inline form rather than opening a second sheet on
@@ -195,6 +218,10 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
                   onDelete={() => {
                     if (editingId === t.id) reset()
                     removeTask(t.id)
+                    toast(`"${t.title}" נמחקה.`, {
+                      actionLabel: 'ביטול',
+                      onAction: () => restore({ tasks: [t] }),
+                    })
                   }}
                 />
               ))}
@@ -232,10 +259,7 @@ function CourseDetail({ course, onClose }: { course: Course | null; onClose: () 
           </div>
 
           <button
-            onClick={() => {
-              removeCourse(course.id)
-              onClose()
-            }}
+            onClick={() => onDeleteCourse(course)}
             className="flex w-full items-center justify-center gap-1.5 py-2 text-sm text-muted transition-colors hover:text-accent"
           >
             <Trash size={16} /> מחק קורס

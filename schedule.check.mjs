@@ -1,46 +1,15 @@
-// Runnable self-check for the scheduling algorithm.  `node schedule.check.mjs`
-// Mirrors src/schedule.ts (kept in sync by hand — it's ~40 lines).
+// Runnable self-check for the app's pure logic.  `npm run check`
+//
+// These import the REAL modules from src/ (Node strips the TypeScript types on
+// the fly). An earlier version re-implemented the algorithm here to avoid a
+// build step, which meant src/schedule.ts could break while every check still
+// passed — the checks were testing their own copy. Import only from modules
+// with no JSX and no browser APIs.
 import assert from 'node:assert/strict'
-
-const parseIso = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
-const toIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const addDaysIso = (s, n) => { const d = parseIso(s); d.setDate(d.getDate() + n); return toIso(d) }
-const isoLt = (a, b) => a < b
-const isoLte = (a, b) => a <= b
-
-function buildSchedule(tasks, exams, today, dailyCap) {
-  const pending = tasks.filter((t) => !t.done)
-  const byDay = {}, load = {}
-  const assign = (day, task) => { load[day] = (load[day] ?? 0) + task.minutes; (byDay[day] ??= []).push(task) }
-
-  const fixed = pending.filter((t) => t.dueDate)
-  const auto = pending.filter((t) => !t.dueDate)
-  for (const task of fixed) assign(isoLt(task.dueDate, today) ? today : task.dueDate, task)
-
-  const nextExamDate = (courseId) => {
-    const up = exams.filter((e) => e.courseId === courseId && isoLte(today, e.date)).map((e) => e.date).sort()
-    return up[0] ?? null
-  }
-  const items = auto.map((task) => {
-    const exam = nextExamDate(task.courseId)
-    let deadline = null
-    if (exam) { deadline = addDaysIso(exam, -1); if (isoLt(deadline, today)) deadline = today }
-    return { task, deadline }
-  })
-  items.sort((a, b) => {
-    if (a.deadline && b.deadline) return a.deadline !== b.deadline ? (a.deadline < b.deadline ? -1 : 1) : b.task.minutes - a.task.minutes
-    if (a.deadline) return -1
-    if (b.deadline) return 1
-    return b.task.minutes - a.task.minutes
-  })
-  for (const { task, deadline } of items) {
-    let day = today
-    while ((load[day] ?? 0) + task.minutes > dailyCap && (!deadline || isoLt(day, deadline))) day = addDaysIso(day, 1)
-    if (deadline && isoLt(deadline, day)) day = deadline
-    assign(day, task)
-  }
-  return byDay
-}
+import { buildSchedule } from './src/schedule.ts'
+import { addDaysIso, isoLt, isoLte, examLabel } from './src/utils.ts'
+import { zoneAt } from './src/planner.ts'
+import { buildIcs } from './src/ics.ts'
 
 const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
@@ -75,13 +44,8 @@ assert.deepEqual(s[T].map((t) => t.id), ['a'])
 
 
 /* ---------------------------------------------------------------------------
- * Exam label (mirrors examLabel in src/utils.ts)
+ * Exam label
  * ------------------------------------------------------------------------- */
-const examLabel = (title, courseName) => {
-  const t = title.trim()
-  if (t && t !== 'מבחן') return t
-  return courseName ? `מבחן ב${courseName}` : 'מבחן'
-}
 
 // 7. A blank title, or the old literal default, falls back to the course name.
 assert.equal(examLabel('', 'כימיה'), 'מבחן בכימיה')
@@ -91,29 +55,50 @@ assert.equal(examLabel('מועד ב', 'כימיה'), 'מועד ב')      // a re
 assert.equal(examLabel('', undefined), 'מבחן')            // course deleted
 
 /* ---------------------------------------------------------------------------
- * ICS escaping + folding (mirrors src/ics.ts)
+ * Calendar export — exercised through the real buildIcs
  * ------------------------------------------------------------------------- */
-const esc = (s) => s.replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n')
-const fold = (line) => {
-  if (line.length <= 75) return line
-  const parts = [line.slice(0, 75)]
-  for (let i = 75; i < line.length; i += 74) parts.push(' ' + line.slice(i, i + 74))
-  return parts.join('\r\n')
-}
+const COURSES = [{ id: 'c1', name: 'כימיה', emoji: '⚗️', color: '#4C7B39' }]
+const NOW = '20260721T120000Z'
 
-// 8. RFC 5545 special characters are escaped, so one field can't break the file.
-assert.equal(esc('a,b;c\\d'), 'a\\,b\\;c\\\\d')
-assert.equal(esc('line1\nline2'), 'line1\\nline2')
+// 8. A well-formed calendar: CRLF line endings, balanced envelope, all-day
+//    events whose exclusive DTEND is the following day.
+const ics = buildIcs(
+  [{ id: 'e1', courseId: 'c1', title: '', date: '2026-07-27' }],
+  { '2026-07-21': [{ id: 't1', courseId: 'c1', title: 'תרגול', minutes: 90, done: false }] },
+  COURSES,
+  NOW,
+)
+assert.ok(ics.startsWith('BEGIN:VCALENDAR\r\n'), 'CRLF envelope')
+assert.ok(ics.trimEnd().endsWith('END:VCALENDAR'), 'envelope closed')
+assert.equal((ics.match(/BEGIN:VEVENT/g) ?? []).length, 2, 'one exam + one task')
+assert.equal((ics.match(/BEGIN:VEVENT/g) ?? []).length, (ics.match(/END:VEVENT/g) ?? []).length)
+assert.ok(ics.includes('DTSTART;VALUE=DATE:20260727'), 'exam start')
+assert.ok(ics.includes('DTEND;VALUE=DATE:20260728'), 'DTEND is exclusive')
+assert.ok(ics.includes('מבחן בכימיה'), 'untitled exam gets the derived label')
 
-// 9. Long lines fold, and every continuation line starts with a space.
-const folded = fold('SUMMARY:' + 'x'.repeat(200)).split('\r\n')
-assert.ok(folded.length > 1, 'long line folds')
-assert.ok(folded[0].length <= 75, 'first segment within 75 octets')
-assert.ok(folded.slice(1).every((l) => l.startsWith(' ')), 'continuations are space-prefixed')
-assert.equal(folded.join('').replace(/ /g, ''), 'SUMMARY:' + 'x'.repeat(200), 'unfolds to the original')
+// 9. Fields that contain RFC 5545 delimiters are escaped rather than breaking
+//    the file structure.
+const nasty = buildIcs(
+  [],
+  { '2026-07-21': [{ id: 't2', courseId: 'c1', title: 'א,ב;ג\\ד', minutes: 60, done: false }] },
+  COURSES,
+  NOW,
+)
+assert.ok(nasty.includes('א\\,ב\\;ג\\\\ד'), 'comma, semicolon and backslash escaped')
+assert.equal((nasty.match(/BEGIN:VEVENT/g) ?? []).length, 1, 'still one event')
 
-// 10. Short lines are left alone.
-assert.equal(fold('SUMMARY:short'), 'SUMMARY:short')
+// 10. Long values fold, and every continuation line starts with a space so the
+//     file unfolds back to the original.
+const long = buildIcs(
+  [],
+  { '2026-07-21': [{ id: 't3', courseId: 'c1', title: 'x'.repeat(200), minutes: 60, done: false }] },
+  COURSES,
+  NOW,
+)
+const summaryLines = long.split('\r\n')
+const startIdx = summaryLines.findIndex((l) => l.startsWith('SUMMARY:'))
+assert.ok(summaryLines[startIdx].length <= 75, 'first segment within 75 chars')
+assert.ok(summaryLines[startIdx + 1].startsWith(' '), 'continuation is space-prefixed')
 
 /* ---------------------------------------------------------------------------
  * Cloud sync race (mirrors the dirty-flag logic in src/cloud.ts)
@@ -153,18 +138,12 @@ sync.remote('from-phone')
 assert.equal(sync.read(), 'from-phone')
 
 /* ---------------------------------------------------------------------------
- * Week-planner drop hit test (mirrors zoneAt in src/screens/WeekPlanner.tsx)
+ * Week-planner drop hit test
  *
  * Motion reports the pointer in page coordinates while getBoundingClientRect
  * is viewport-relative, so the caller adds scroll offset when building zones.
  * These checks pin the boundary behaviour that decides which day a drop lands on.
  * ------------------------------------------------------------------------- */
-function zoneAt(x, y, zones) {
-  for (const z of zones) {
-    if (x >= z.left && x <= z.right && y >= z.top && y <= z.bottom) return z.key
-  }
-  return null
-}
 
 // Two side-by-side day columns and a pool strip underneath.
 const ZONES = [
@@ -197,4 +176,65 @@ const SCROLLED = [{ key: '2026-07-22', left: 0, top: 1100, right: 99, bottom: 12
 assert.equal(zoneAt(50, 1150, SCROLLED), '2026-07-22')
 assert.equal(zoneAt(50, 150, SCROLLED), null, 'viewport coords must not match')
 
-console.log('schedule.check.mjs: all 18 checks passed ✓')
+/* ---------------------------------------------------------------------------
+ * Undo after delete (the real store)
+ *
+ * Deleting a course cascades to its tasks and exams, so undo has to bring all
+ * three back — and must not duplicate rows if it runs twice.
+ * ------------------------------------------------------------------------- */
+const { useStore, captureCourse } = await import('./src/store.ts')
+
+const seed = () =>
+  useStore.setState({
+    courses: [
+      { id: 'c1', name: 'כימיה', emoji: '⚗️', color: '#4C7B39' },
+      { id: 'c2', name: 'פיזיקה', emoji: '📐', color: '#714F21' },
+    ],
+    tasks: [
+      { id: 't1', courseId: 'c1', title: 'a', minutes: 60, done: false },
+      { id: 't2', courseId: 'c1', title: 'b', minutes: 60, done: false },
+      { id: 't3', courseId: 'c2', title: 'c', minutes: 60, done: false },
+    ],
+    exams: [
+      { id: 'e1', courseId: 'c1', title: '', date: '2026-08-01' },
+      { id: 'e2', courseId: 'c2', title: '', date: '2026-08-02' },
+    ],
+  })
+
+// 19. Deleting a course takes its tasks and exams with it, and leaves the
+//     other course untouched.
+seed()
+const undo = captureCourse('c1')
+useStore.getState().removeCourse('c1')
+let st = useStore.getState()
+assert.deepEqual(st.courses.map((c) => c.id), ['c2'])
+assert.deepEqual(st.tasks.map((t) => t.id), ['t3'], 'c1 tasks removed')
+assert.deepEqual(st.exams.map((e) => e.id), ['e2'], 'c1 exams removed')
+
+// 20. Undo restores every cascaded row.
+useStore.getState().restore(undo)
+st = useStore.getState()
+assert.deepEqual(st.courses.map((c) => c.id).sort(), ['c1', 'c2'])
+assert.deepEqual(st.tasks.map((t) => t.id).sort(), ['t1', 't2', 't3'], 'tasks came back')
+assert.deepEqual(st.exams.map((e) => e.id).sort(), ['e1', 'e2'], 'exams came back')
+
+// 21. Undo twice must not duplicate anything.
+useStore.getState().restore(undo)
+st = useStore.getState()
+assert.equal(st.tasks.length, 3, 'no duplicate tasks')
+assert.equal(st.courses.length, 2, 'no duplicate courses')
+
+// 22. Undoing a delete must not revert edits made while the toast was up:
+//     only the captured rows come back.
+seed()
+const undoC1 = captureCourse('c1')
+useStore.getState().removeCourse('c1')
+useStore.getState().updateCourse('c2', { name: 'פיזיקה 2' })
+useStore.getState().restore(undoC1)
+assert.equal(
+  useStore.getState().courses.find((c) => c.id === 'c2').name,
+  'פיזיקה 2',
+  'unrelated edit survives the undo',
+)
+
+console.log('schedule.check.mjs: all 22 checks passed ✓')

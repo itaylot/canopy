@@ -1,5 +1,7 @@
 import type { Task, Exam } from './store'
-import { addDaysIso, isoLt, isoLte } from './utils'
+// Explicit .ts extension so plain Node can import this module for the self-check
+// (schedule.check.mjs) without a build step. Vite resolves it identically.
+import { addDaysIso, isoLt, isoLte } from './utils.ts'
 
 export type DaySchedule = Record<string, Task[]> // isoDate -> tasks planned that day
 

@@ -1,7 +1,8 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
 import type { Course, Task } from './store'
+import { useToasts, type Toast as ToastType } from './toast'
 import { formatDuration } from './utils'
 
 /* ---------- Brand mark: two trees, a rope, a rider ---------- */
@@ -32,11 +33,31 @@ export function Sheet({
   children: ReactNode
 }) {
   const reduce = useReducedMotion()
+
+  // Escape closes the sheet, and the page behind it stops scrolling while it is
+  // up — on a phone, a scrolling background under an open sheet feels broken.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [open, onClose])
+
   return (
     <AnimatePresence>
       {open && (
         <motion.div
           className="fixed inset-0 z-40 flex items-end justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -259,6 +280,61 @@ export function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: ()
         )}
       </AnimatePresence>
     </span>
+  )
+}
+
+/* ---------- Toasts ---------- */
+/** Sits above the mobile dock so it never covers the tab bar. */
+export function Toaster() {
+  const { toasts, dismiss } = useToasts()
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col items-center gap-2 px-4 pb-[max(5.5rem,calc(env(safe-area-inset-bottom)+5rem))] lg:max-w-lg lg:pb-6">
+      <AnimatePresence>
+        {toasts.map((t) => (
+          <ToastRow key={t.id} toast={t} onDone={() => dismiss(t.id)} />
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function ToastRow({ toast: t, onDone }: { toast: ToastType; onDone: () => void }) {
+  useEffect(() => {
+    if (!t.duration) return
+    const timer = setTimeout(onDone, t.duration)
+    return () => clearTimeout(timer)
+  }, [t.duration, onDone])
+
+  return (
+    <motion.div
+      layout
+      role="status"
+      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      className="pointer-events-auto flex w-full items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-lg"
+    >
+      <span className="min-w-0 flex-1">{t.message}</span>
+      {t.actionLabel && (
+        <button
+          onClick={() => {
+            t.onAction?.()
+            onDone()
+          }}
+          className="shrink-0 rounded-lg px-2 py-1 font-semibold text-accent transition-colors hover:bg-white/10"
+        >
+          {t.actionLabel}
+        </button>
+      )}
+      <button
+        onClick={onDone}
+        aria-label="סגור"
+        className="shrink-0 rounded-lg px-1.5 text-white/60 transition-colors hover:text-white"
+      >
+        ✕
+      </button>
+    </motion.div>
   )
 }
 

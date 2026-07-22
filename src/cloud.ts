@@ -3,6 +3,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth'
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { useStore } from './store'
+import { toast, useToasts } from './toast'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -32,6 +33,28 @@ const snapshotOf = (s: ReturnType<typeof useStore.getState>) => ({
   ...dataOf(s),
   updatedAt: serverTimestamp(),
 })
+
+/**
+ * A failed write used to be logged to the console and nothing else, which is
+ * exactly how a batch of tasks was once lost in silence: the app looked fine
+ * while every write was being rejected. Now it says so.
+ *
+ * One toast at a time, held open until a write succeeds — a repeated failure
+ * (offline, expired token, rejected by rules) must not stack up dozens of them.
+ */
+let errorToastId: number | null = null
+
+function reportSyncFailed(e: unknown, context: string) {
+  console.error(`${context}:`, e)
+  if (errorToastId !== null) return
+  errorToastId = toast('השינויים לא נשמרו בענן. בדוק את החיבור.', { duration: 0 })
+}
+
+function reportSyncOk() {
+  if (errorToastId === null) return
+  useToasts.getState().dismiss(errorToastId)
+  errorToastId = null
+}
 
 // Two-way sync between the Zustand store and the user's single Firestore doc.
 // The whole app state lives in one document (users/{uid}) as JSON — no per-entity
@@ -67,9 +90,9 @@ export function useCloudSync(user: User | null) {
         applyingRemote = false
       } else {
         // First sign-in: seed the cloud doc from whatever is in memory.
-        void setDoc(ref, snapshotOf(useStore.getState())).catch((e) =>
-          console.error('cloud sync (initial seed) failed:', e),
-        )
+        void setDoc(ref, snapshotOf(useStore.getState()))
+          .then(reportSyncOk)
+          .catch((e) => reportSyncFailed(e, 'cloud sync (initial seed) failed'))
       }
     })
 
@@ -82,7 +105,8 @@ export function useCloudSync(user: User | null) {
         // Send the state as of *now*, not as of the edit that queued this timer —
         // later edits inside the window would otherwise be dropped.
         void setDoc(ref, snapshotOf(useStore.getState()), { merge: true })
-          .catch((e) => console.error('cloud sync failed:', e))
+          .then(reportSyncOk)
+          .catch((e) => reportSyncFailed(e, 'cloud sync failed'))
           .finally(() => {
             // Only stop ignoring remote snapshots once nothing newer is queued.
             if (!timer) dirty = false

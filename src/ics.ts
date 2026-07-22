@@ -1,6 +1,7 @@
 import type { Course, Exam, Task } from './store'
 import type { DaySchedule } from './schedule'
-import { addDaysIso, examLabel, formatDuration } from './utils'
+// Explicit .ts extension so plain Node can import this for the self-check.
+import { addDaysIso, examLabel, formatDuration } from './utils.ts'
 
 // A one-way snapshot export: exams and scheduled tasks as all-day events, in
 // the iCalendar format every calendar app can import. Deliberately not a live
