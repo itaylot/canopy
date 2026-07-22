@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { buildSchedule, unscheduled, dayLoad } from './src/schedule.ts'
 import { addDaysIso, examLabel } from './src/utils.ts'
-import { zoneAt } from './src/planner.ts'
+import { zoneAt, tapGuard } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
 
 const T = '2026-07-19'
@@ -186,6 +186,37 @@ assert.equal(zoneAt(50, 1150, SCROLLED), '2026-07-22')
 assert.equal(zoneAt(50, 150, SCROLLED), null, 'viewport coords must not match')
 
 /* ---------------------------------------------------------------------------
+ * Click-after-drag guard
+ *
+ * Releasing a drag over a button makes the browser fire a click on it, which
+ * popped the day picker open after every single drop — the dialog dragging
+ * exists to avoid.
+ * ------------------------------------------------------------------------- */
+
+// 19. A plain tap (down, then click, no drag) goes through.
+let g = tapGuard()
+g.down()
+assert.equal(g.shouldIgnoreClick(), false, 'a tap is not swallowed')
+
+// 20. A click that follows a drag is swallowed.
+g = tapGuard()
+g.down()
+g.dragStart()
+assert.equal(g.shouldIgnoreClick(), true, 'the stray post-drag click is ignored')
+
+// 21. And the very next tap works again — the flag must not stick, or the chip
+//     would stop responding to taps after its first drag.
+g.down()
+assert.equal(g.shouldIgnoreClick(), false, 'the guard resets for the next interaction')
+
+// 22. Even if no click arrives after a drag, the next pointerdown clears it.
+g = tapGuard()
+g.down()
+g.dragStart()
+g.down()
+assert.equal(g.shouldIgnoreClick(), false, 'a fresh interaction is never blocked')
+
+/* ---------------------------------------------------------------------------
  * Undo after delete (the real store)
  *
  * Deleting a course cascades to its tasks and exams, so undo has to bring all
@@ -210,7 +241,7 @@ const seed = () =>
     ],
   })
 
-// 19. Deleting a course takes its tasks and exams with it, and leaves the
+// 23. Deleting a course takes its tasks and exams with it, and leaves the
 //     other course untouched.
 seed()
 const undo = captureCourse('c1')
@@ -220,20 +251,20 @@ assert.deepEqual(st.courses.map((c) => c.id), ['c2'])
 assert.deepEqual(st.tasks.map((t) => t.id), ['t3'], 'c1 tasks removed')
 assert.deepEqual(st.exams.map((e) => e.id), ['e2'], 'c1 exams removed')
 
-// 20. Undo restores every cascaded row.
+// 24. Undo restores every cascaded row.
 useStore.getState().restore(undo)
 st = useStore.getState()
 assert.deepEqual(st.courses.map((c) => c.id).sort(), ['c1', 'c2'])
 assert.deepEqual(st.tasks.map((t) => t.id).sort(), ['t1', 't2', 't3'], 'tasks came back')
 assert.deepEqual(st.exams.map((e) => e.id).sort(), ['e1', 'e2'], 'exams came back')
 
-// 21. Undo twice must not duplicate anything.
+// 25. Undo twice must not duplicate anything.
 useStore.getState().restore(undo)
 st = useStore.getState()
 assert.equal(st.tasks.length, 3, 'no duplicate tasks')
 assert.equal(st.courses.length, 2, 'no duplicate courses')
 
-// 22. Undoing a delete must not revert edits made while the toast was up:
+// 26. Undoing a delete must not revert edits made while the toast was up:
 //     only the captured rows come back.
 seed()
 const undoC1 = captureCourse('c1')
@@ -246,4 +277,4 @@ assert.equal(
   'unrelated edit survives the undo',
 )
 
-console.log('schedule.check.mjs: all 23 checks passed ✓')
+console.log('schedule.check.mjs: all 27 checks passed ✓')

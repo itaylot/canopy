@@ -21,3 +21,31 @@ export function zoneAt(x: number, y: number, zones: Zone[]): string | null {
   }
   return null
 }
+
+/**
+ * Suppresses the click the browser fires when a drag is released over a button.
+ *
+ * Dropping a task used to open the day picker every single time, because the
+ * chip's title is a button and the pointer release lands on it. Dragging exists
+ * to avoid that dialog, so a click that followed a drag is swallowed — while an
+ * ordinary tap, which never starts a drag, still goes through.
+ *
+ * Pure and separate from the component so it can actually be checked: Motion
+ * owns the real drag events, which makes the wired-up version untestable
+ * outside a browser running an animation loop.
+ */
+export function tapGuard() {
+  let dragged = false
+  return {
+    /** A new interaction begins. */
+    down: () => void (dragged = false),
+    /** The pointer moved far enough that Motion started dragging. */
+    dragStart: () => void (dragged = true),
+    /** True when this click should be ignored. Consumes the flag either way. */
+    shouldIgnoreClick: () => {
+      const ignore = dragged
+      dragged = false
+      return ignore
+    },
+  }
+}

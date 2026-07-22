@@ -3,7 +3,7 @@ import { AnimatePresence, motion, type PanInfo } from 'motion/react'
 import { CaretRight, CaretLeft, ArrowUUpLeft, Tray } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
 import { buildSchedule, unscheduled, dayLoad } from '../schedule'
-import { zoneAt, POOL, type Zone } from '../planner'
+import { zoneAt, tapGuard, POOL, type Zone } from '../planner'
 import {
   todayIso,
   addDaysIso,
@@ -313,6 +313,12 @@ function PlannerChip({
   onPick: () => void
   onToggle: () => void
 }) {
+  // See tapGuard: swallows the stray click a drag release fires on a button.
+  const guard = useRef(tapGuard()).current
+  const tap = (fn: () => void) => () => {
+    if (!guard.shouldIgnoreClick()) fn()
+  }
+
   return (
     <motion.div
       layout
@@ -320,7 +326,11 @@ function PlannerChip({
       dragSnapToOrigin
       dragMomentum={false}
       dragElastic={0.12}
-      onDragStart={onDragStart}
+      onPointerDownCapture={guard.down}
+      onDragStart={() => {
+        guard.dragStart()
+        onDragStart()
+      }}
       onDrag={onDragMove}
       onDragEnd={onDrop}
       whileDrag={{ scale: 1.06, zIndex: 50, cursor: 'grabbing' }}
@@ -334,13 +344,13 @@ function PlannerChip({
       }}
     >
       <button
-        onClick={onToggle}
+        onClick={tap(onToggle)}
         aria-label={task.done ? 'בטל סימון' : 'סמן כהושלם'}
         className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors ${
           task.done ? 'border-primary bg-primary' : 'border-line'
         }`}
       />
-      <button onClick={onPick} className="min-w-0 flex-1 cursor-grab text-right active:cursor-grabbing">
+      <button onClick={tap(onPick)} className="min-w-0 flex-1 cursor-grab text-right active:cursor-grabbing">
         <span className="block truncate text-[11px] font-semibold leading-tight text-ink">{task.title}</span>
         <span className="block truncate text-[10px] leading-tight text-muted">
           {course ? `${course.name} · ` : ''}
