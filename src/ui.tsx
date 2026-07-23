@@ -160,6 +160,8 @@ export function TaskRow({
   onToggle,
   onEdit,
   onDelete,
+  menu,
+  note,
   flat = false,
 }: {
   task: Task
@@ -167,6 +169,11 @@ export function TaskRow({
   onToggle: () => void
   onEdit?: () => void
   onDelete?: () => void
+  /** Replaces the default edit/delete menu — used by the overdue list, whose
+   *  actions are about rescheduling rather than editing. */
+  menu?: MenuItem[]
+  /** Extra context under the title, e.g. the day an overdue task was planned for. */
+  note?: string
   /** Renders as a plain row (for lists inside one Card with dividers) instead of a standalone card. */
   flat?: boolean
 }) {
@@ -198,10 +205,18 @@ export function TaskRow({
           {course ? `${course.name} · ` : ''}
           {formatDuration(task.minutes)}
         </div>
+        {note && <div className="mt-0.5 truncate text-[11px] text-accent">{note}</div>}
       </button>
 
-      {onEdit && onDelete ? (
-        <RowMenu onEdit={onEdit} onDelete={onDelete} />
+      {menu ? (
+        <RowMenu items={menu} />
+      ) : onEdit && onDelete ? (
+        <RowMenu
+          items={[
+            { label: 'עריכה', Icon: PencilSimple, onClick: onEdit },
+            { label: 'מחיקה', Icon: Trash, onClick: onDelete, danger: true },
+          ]}
+        />
       ) : (
         onDelete && (
           <button
@@ -226,11 +241,20 @@ export function TaskRow({
   )
 }
 
-/* ---------- Row overflow menu (edit / delete) ---------- */
-/** One menu for every kind of row — task, exam, course. Closes on outside
- *  click via a full-screen transparent backdrop, which also stops the click
- *  from reaching whatever is underneath. */
-export function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+/* ---------- Row overflow menu ---------- */
+export type MenuItem = {
+  label: string
+  Icon: typeof PencilSimple
+  onClick: () => void
+  /** Red styling for destructive actions. */
+  danger?: boolean
+}
+
+/** One menu for every kind of row — task, exam, course. Takes its actions as
+ *  data rather than hard-coding edit/delete, because an overdue task offers a
+ *  different set. Closes on outside click via a full-screen transparent
+ *  backdrop, which also stops the click reaching whatever is underneath. */
+export function RowMenu({ items }: { items: MenuItem[] }) {
   const [open, setOpen] = useState(false)
   return (
     <span className="relative shrink-0">
@@ -255,26 +279,24 @@ export function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: ()
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94 }}
               transition={{ duration: 0.14 }}
-              className="absolute left-0 top-9 z-50 w-36 overflow-hidden rounded-xl bg-surface py-1 text-right shadow-lg ring-1 ring-line"
+              className="absolute left-0 top-9 z-50 w-40 overflow-hidden rounded-xl bg-surface py-1 text-right shadow-lg ring-1 ring-line"
             >
-              <button
-                onClick={() => {
-                  setOpen(false)
-                  onEdit()
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink transition-colors hover:bg-primary-soft"
-              >
-                <PencilSimple size={16} /> עריכה
-              </button>
-              <button
-                onClick={() => {
-                  setOpen(false)
-                  onDelete()
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
-              >
-                <Trash size={16} /> מחיקה
-              </button>
+              {items.map(({ label, Icon, onClick, danger }) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    setOpen(false)
+                    onClick()
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                    danger
+                      ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'
+                      : 'text-ink hover:bg-primary-soft'
+                  }`}
+                >
+                  <Icon size={16} /> {label}
+                </button>
+              ))}
             </motion.div>
           </>
         )}

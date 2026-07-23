@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { CaretRight, CaretLeft, Plus } from '@phosphor-icons/react'
+import { CaretRight, CaretLeft, Plus, PencilSimple, Trash } from '@phosphor-icons/react'
 import { useStore, type Course, type Exam, type Task } from '../store'
 import { buildSchedule } from '../schedule'
 import { todayIso, monthLabel, formatHe, examLabel, monthCells } from '../utils'
@@ -23,10 +23,7 @@ export default function CalendarScreen() {
   const [hidden, setHidden] = useState<Set<string>>(new Set())
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
-  const schedule = useMemo(
-    () => buildSchedule(tasks, today),
-    [tasks, today],
-  )
+  const schedule = useMemo(() => buildSchedule(tasks), [tasks])
   const examsByDay = useMemo(() => {
     const m = new Map<string, Exam[]>()
     exams.forEach((e) => {
@@ -198,7 +195,12 @@ function DaySheet({
                   · {c?.emoji} {c?.name}
                 </span>
               </span>
-              <RowMenu onEdit={() => onEditExam(e)} onDelete={() => onDeleteExam(e)} />
+              <RowMenu
+                items={[
+                  { label: 'עריכה', Icon: PencilSimple, onClick: () => onEditExam(e) },
+                  { label: 'מחיקה', Icon: Trash, onClick: () => onDeleteExam(e), danger: true },
+                ]}
+              />
             </div>
           )
         })}

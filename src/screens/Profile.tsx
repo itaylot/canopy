@@ -20,7 +20,7 @@ export default function Profile() {
 
   const exportCalendar = () => {
     const today = todayIso()
-    const schedule = buildSchedule(tasks, today)
+    const schedule = buildSchedule(tasks)
     // DTSTAMP must be a UTC timestamp, unlike the all-day dates in the events.
     const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
     downloadIcs(buildIcs(exams, schedule, courses, now))

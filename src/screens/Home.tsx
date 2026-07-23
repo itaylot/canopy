@@ -1,17 +1,19 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   Timer,
   Play,
   Pause,
   ArrowCounterClockwise,
+  ArrowDown,
+  ArrowUUpLeft,
   CheckCircle,
   Leaf,
   BookOpen,
   CalendarCheck,
 } from '@phosphor-icons/react'
-import { useStore } from '../store'
-import { buildSchedule, unscheduled } from '../schedule'
+import { useStore, type Course, type Task } from '../store'
+import { buildSchedule, unscheduled, overdue } from '../schedule'
 import {
   todayIso,
   toIso,
@@ -23,6 +25,7 @@ import {
   monthLabel,
   examLabel,
   monthCells,
+  formatHeShort,
 } from '../utils'
 import { TaskRow, LeafBurst, Card } from '../ui'
 import { CanopyScene } from '../CanopyScene'
@@ -34,13 +37,19 @@ export default function Home() {
   const today = todayIso()
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
 
-  const schedule = useMemo(
-    () => buildSchedule(tasks, today),
-    [tasks, today],
-  )
+  const schedule = useMemo(() => buildSchedule(tasks), [tasks])
   const pendingToday = schedule[today] ?? []
   const doneToday = tasks.filter((t) => t.done && t.completedAt === today)
   const total = pendingToday.length + doneToday.length
+
+  // Tasks whose day has passed without being ticked off. They are deliberately
+  // not mixed into today's list: nothing lands on today's plate unless the user
+  // put it there.
+  const overdueTasks = useMemo(() => overdue(tasks, today), [tasks, today])
+  const [taskTab, setTaskTab] = useState<'today' | 'overdue'>('today')
+  // Derived, not stored: finishing the last overdue task must not leave the
+  // card sitting on an empty tab.
+  const activeTab = overdueTasks.length === 0 ? 'today' : taskTab
 
   const upcomingExams = useMemo(
     () => [...exams].filter((e) => e.date >= today).sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 2),
@@ -78,47 +87,70 @@ export default function Home() {
           reward for doing them, not the thing to look at first. */}
       <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-stretch lg:gap-5 lg:space-y-0">
         <Card className="p-4 lg:h-full">
-          <div className="mb-1 flex items-baseline justify-between">
-            <h2 className="font-bold text-ink">המשימות להיום</h2>
-            {total > 0 && (
-              <span className="text-sm text-muted">
+          {/* Two lists, one card. The overdue tab only appears when something
+              is actually overdue, so an ordinary day stays a single list. */}
+          <div className="mb-1 flex items-baseline justify-between gap-2">
+            {overdueTasks.length === 0 ? (
+              <h2 className="font-bold text-ink">המשימות להיום</h2>
+            ) : (
+              <div className="flex items-center gap-1">
+                <TabButton on={activeTab === 'today'} onClick={() => setTaskTab('today')}>
+                  היום
+                </TabButton>
+                <TabButton on={activeTab === 'overdue'} onClick={() => setTaskTab('overdue')}>
+                  לא הושלמו
+                  <span className="mr-1.5 rounded-full bg-accent px-1.5 text-[10px] font-bold text-white tabular-nums">
+                    {overdueTasks.length}
+                  </span>
+                </TabButton>
+              </div>
+            )}
+            {activeTab === 'today' && total > 0 && (
+              <span className="shrink-0 text-sm text-muted">
                 {doneToday.length} מתוך {total}
               </span>
             )}
           </div>
 
-          <div className="divide-y divide-line/70">
-            <AnimatePresence mode="popLayout">
-              {pendingToday.map((t) => (
-                <TaskRow key={t.id} flat task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
-              ))}
-            </AnimatePresence>
-
-            {allDone && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="rounded-2xl bg-primary-soft px-4 py-6 text-center"
-              >
-                <CheckCircle weight="fill" size={32} className="mx-auto text-primary" />
-                <p className="mt-2 font-semibold text-ink">סיימת את כל המשימות של היום.</p>
-                <p className="text-sm text-muted">המסלול שלך התקדם ב-{doneToday.length}.</p>
-              </motion.div>
-            )}
-
-            {/* An empty day means different things depending on how far along
-                the setup is, so it points at the step that is actually next. */}
-            {total === 0 && <EmptyToday />}
-
-            {doneToday.length > 0 && pendingToday.length > 0 && (
-              <div className="pt-2">
-                <p className="pt-2 text-xs font-medium text-muted">הושלמו היום</p>
-                {doneToday.map((t) => (
+          {activeTab === 'overdue' ? (
+            <OverdueList tasks={overdueTasks} courseById={courseById} today={today} />
+          ) : (
+            <div className="divide-y divide-line/70">
+              <AnimatePresence mode="popLayout">
+                {pendingToday.map((t) => (
                   <TaskRow key={t.id} flat task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
                 ))}
-              </div>
-            )}
-          </div>
+              </AnimatePresence>
+
+              {allDone && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="rounded-2xl bg-primary-soft px-4 py-6 text-center"
+                >
+                  <CheckCircle weight="fill" size={32} className="mx-auto text-primary" />
+                  <p className="mt-2 font-semibold text-ink">סיימת את כל המשימות של היום.</p>
+                  <p className="text-sm text-muted">המסלול שלך התקדם ב-{doneToday.length}.</p>
+                </motion.div>
+              )}
+
+              {/* An empty day means different things depending on how far along
+                  the setup is, so it points at the step that is actually next. */}
+              {total === 0 && <EmptyToday />}
+
+              {/* Shown whenever anything was completed today, including after
+                  the last one — otherwise a mistaken tick could only be undone
+                  from the courses screen. */}
+              {doneToday.length > 0 && (
+                <div className="pt-2">
+                  <p className="pt-2 text-xs font-medium text-muted">הושלמו היום</p>
+                  {doneToday.map((t) => (
+                    <TaskRow key={t.id} flat task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* The scene is much shorter than the task list, so the timer sits
@@ -126,12 +158,16 @@ export default function Home() {
             beside the tasks. */}
         <div className="space-y-5 lg:flex lg:h-full lg:flex-col lg:space-y-0 lg:gap-5">
           <Card className="overflow-hidden">
-            {/* the illustration's own cream sky is the card surface */}
-            <CanopyScene done={tasks.filter((t) => t.done).length} remaining={tasks.filter((t) => !t.done).length} />
+            {/* One checkpoint per task planned for today — the route is the
+                day, not the whole semester. Both counts come from the same
+                state the list above renders, so it tracks every tick live. */}
+            <CanopyScene done={doneToday.length} remaining={pendingToday.length} />
             <p className="px-4 py-3 text-center text-sm text-muted">
-              {tasks.length === 0
-                ? 'הוסף משימות כדי למתוח את המסלול.'
-                : 'השלם משימות כדי להאריך את המסלול.'}
+              {total === 0
+                ? 'שבץ משימות ליום כדי למתוח את המסלול.'
+                : allDone
+                  ? 'הגעת לקצה המסלול של היום.'
+                  : `${doneToday.length} מתוך ${total} תחנות היום.`}
             </p>
           </Card>
 
@@ -171,6 +207,70 @@ export default function Home() {
 
         <MiniMonth schedule={schedule} today={today} />
       </div>
+    </div>
+  )
+}
+
+function TabButton({
+  on,
+  onClick,
+  children,
+}: {
+  on: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`flex items-center rounded-lg px-2.5 py-1 text-sm font-bold transition-colors ${
+        on ? 'bg-primary-soft text-primary' : 'text-muted hover:text-ink'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Tasks whose day passed without being ticked off.
+ *
+ * Every row can be completed here, and its menu offers the two ways out that
+ * don't need the planner: pull it onto today, or send it back to the pool.
+ * Moving it to some other specific day is a drag away in the week planner.
+ */
+function OverdueList({
+  tasks,
+  courseById,
+  today,
+}: {
+  tasks: Task[]
+  courseById: Map<string, Course>
+  today: string
+}) {
+  const { toggleTask, setTaskDay } = useStore()
+  return (
+    <div className="divide-y divide-line/70">
+      <p className="pb-1 text-xs text-muted">
+        משימות שתכננת ולא סימנת. הן לא נספרות בעומס של היום — אתה מחליט מה לעשות איתן.
+      </p>
+      <AnimatePresence mode="popLayout">
+        {tasks.map((t) => (
+          <TaskRow
+            key={t.id}
+            flat
+            task={t}
+            course={courseById.get(t.courseId)}
+            note={`תוכננה ל${formatHeShort(t.dueDate!)}`}
+            onToggle={() => toggleTask(t.id)}
+            menu={[
+              { label: 'העבר להיום', Icon: ArrowDown, onClick: () => setTaskDay(t.id, today) },
+              { label: 'החזר למאגר', Icon: ArrowUUpLeft, onClick: () => setTaskDay(t.id, undefined) },
+            ]}
+          />
+        ))}
+      </AnimatePresence>
     </div>
   )
 }

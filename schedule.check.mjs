@@ -6,7 +6,7 @@
 // passed — the checks were testing their own copy. Import only from modules
 // with no JSX and no browser APIs.
 import assert from 'node:assert/strict'
-import { buildSchedule, unscheduled, dayLoad } from './src/schedule.ts'
+import { buildSchedule, unscheduled, scheduled, overdue, dayLoad } from './src/schedule.ts'
 import { addDaysIso, examLabel } from './src/utils.ts'
 import { zoneAt, tapGuard } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
@@ -15,22 +15,22 @@ const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
 
 // 1. A task placed on a day lands on that day.
-let s = buildSchedule([task('a', 'c1', 30, { dueDate: T })], T)
+let s = buildSchedule([task('a', 'c1', 30, { dueDate: T })])
 assert.deepEqual(s[T].map((t) => t.id), ['a'])
 
 // 2. Done tasks are ignored.
-s = buildSchedule([task('a', 'c1', 30, { done: true, dueDate: T })], T)
+s = buildSchedule([task('a', 'c1', 30, { done: true, dueDate: T })])
 assert.equal(Object.keys(s).length, 0)
 
 // 3. A day holds however much the user put there — no cap moves anything.
-s = buildSchedule([task('a', 'c1', 120, { dueDate: T }), task('b', 'c1', 120, { dueDate: T })], T)
+s = buildSchedule([task('a', 'c1', 120, { dueDate: T }), task('b', 'c1', 120, { dueDate: T })])
 assert.deepEqual(s[T].map((t) => t.id).sort(), ['a', 'b'])
 
 // 4. NOTHING is scheduled automatically. A task with no day is not placed on
 //    any day — it waits in the pool. This is what makes "drag back to the pool"
 //    possible at all: the scheduler used to put such a task straight back onto
 //    a day, so returning one to the pool looked like the drag had failed.
-s = buildSchedule([task('a', 'c1', 120), task('b', 'c1', 120)], T)
+s = buildSchedule([task('a', 'c1', 120), task('b', 'c1', 120)])
 assert.deepEqual(s, {}, 'undated tasks are not placed anywhere')
 
 // 5. Those same tasks are exactly what the pool shows, and completed ones are
@@ -42,12 +42,44 @@ const waiting = unscheduled([
 ])
 assert.deepEqual(waiting.map((t) => t.id), ['a'])
 
-// 6. A day that has passed and is still not done resurfaces on today, rather
-//    than staying somewhere nobody looks.
-s = buildSchedule([task('a', 'c1', 30, { dueDate: addDaysIso(T, -5) })], T)
-assert.deepEqual(s[T].map((t) => t.id), ['a'])
+// 6. A missed task is NEVER relocated. It stays on the day it was planned for
+//    — it used to be moved onto today, which silently inflated today's load and
+//    made the task vanish from the day the user had actually chosen.
+const past = addDaysIso(T, -5)
+s = buildSchedule([task('a', 'c1', 30, { dueDate: past })])
+assert.deepEqual(s[past].map((t) => t.id), ['a'], 'stays on its own day')
+assert.equal(s[T], undefined, 'today is left alone')
 
-// 6b. Day load drives the "overloaded" badge.
+// 6b. The three pending states are mutually exclusive and cover everything
+//     that is not done — that is what lets each screen ask for exactly one of
+//     them without a task showing up twice or falling through the cracks.
+const ALL = [
+  task('pool', 'c1', 60),
+  task('future', 'c1', 60, { dueDate: addDaysIso(T, 2) }),
+  task('todayTask', 'c1', 60, { dueDate: T }),
+  task('missed', 'c1', 60, { dueDate: past }),
+  task('finished', 'c1', 60, { done: true, dueDate: past }),
+]
+const ids = (list) => list.map((t) => t.id).sort()
+assert.deepEqual(ids(unscheduled(ALL)), ['pool'])
+assert.deepEqual(ids(scheduled(ALL, T)), ['future', 'todayTask'], 'today counts as scheduled')
+assert.deepEqual(ids(overdue(ALL, T)), ['missed'])
+assert.equal(
+  unscheduled(ALL).length + scheduled(ALL, T).length + overdue(ALL, T).length,
+  ALL.filter((t) => !t.done).length,
+  'every pending task lands in exactly one bucket',
+)
+
+// 6c. Overdue is oldest first, so the longest-neglected task is at the top.
+const older = addDaysIso(T, -9)
+assert.deepEqual(
+  overdue([task('b', 'c1', 30, { dueDate: past }), task('a', 'c1', 30, { dueDate: older })], T).map(
+    (t) => t.id,
+  ),
+  ['a', 'b'],
+)
+
+// 6d. Day load drives the "overloaded" badge.
 assert.equal(dayLoad([task('a', 'c1', 90), task('b', 'c1', 60)]), 150)
 assert.equal(dayLoad([]), 0)
 
@@ -277,4 +309,4 @@ assert.equal(
   'unrelated edit survives the undo',
 )
 
-console.log('schedule.check.mjs: all 27 checks passed ✓')
+console.log('schedule.check.mjs: all 30 checks passed ✓')

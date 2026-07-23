@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Plus, Trash } from '@phosphor-icons/react'
+import { Plus, Trash, PencilSimple } from '@phosphor-icons/react'
 import { useStore, captureCourse, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
 import { toast } from '../toast'
 import { goTo } from '../nav'
@@ -105,7 +105,12 @@ export default function Courses() {
                     {relativeDaysHe(today, exam.date)}
                   </span>
                 )}
-                <RowMenu onEdit={() => setEditingCourse(c)} onDelete={() => deleteCourse(c)} />
+                <RowMenu
+                  items={[
+                    { label: 'עריכה', Icon: PencilSimple, onClick: () => setEditingCourse(c) },
+                    { label: 'מחיקה', Icon: Trash, onClick: () => deleteCourse(c), danger: true },
+                  ]}
+                />
               </div>
               <div className="h-1.5 w-full bg-line/60">
                 <motion.div

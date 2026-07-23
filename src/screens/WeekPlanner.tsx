@@ -1,8 +1,15 @@
 import { useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, type PanInfo } from 'motion/react'
-import { CaretRight, CaretLeft, ArrowUUpLeft, Tray } from '@phosphor-icons/react'
+import {
+  CaretRight,
+  CaretLeft,
+  ArrowUUpLeft,
+  ArrowCounterClockwise,
+  Tray,
+  WarningCircle,
+} from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
-import { buildSchedule, unscheduled, dayLoad } from '../schedule'
+import { buildSchedule, unscheduled, dayLoad, overdue } from '../schedule'
 import { zoneAt, tapGuard, POOL, type Zone } from '../planner'
 import {
   todayIso,
@@ -13,6 +20,7 @@ import {
   examLabel,
   formatDuration,
   dayOfMonth,
+  formatHeShort,
 } from '../utils'
 import { Sheet, CourseFilter } from '../ui'
 import { goTo } from '../nav'
@@ -37,7 +45,7 @@ export default function WeekPlanner() {
   const [picking, setPicking] = useState<Task | null>(null)
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
-  const schedule = useMemo(() => buildSchedule(tasks, today), [tasks, today])
+  const schedule = useMemo(() => buildSchedule(tasks), [tasks])
   const examsByDay = useMemo(() => {
     const m = new Map<string, typeof exams>()
     exams.forEach((e) => {
@@ -62,6 +70,11 @@ export default function WeekPlanner() {
       .filter((g) => g.items.length > 0)
   }, [tasks, courses, hidden])
   const poolCount = pool.reduce((n, g) => n + g.items.length, 0)
+
+  const overdueTasks = useMemo(
+    () => overdue(tasks, today).filter((t) => !hidden.has(t.courseId)),
+    [tasks, today, hidden],
+  )
 
   // Drop targets register themselves so the hit test needs no DOM queries.
   const zoneEls = useRef(new Map<string, HTMLElement>())
@@ -101,36 +114,43 @@ export default function WeekPlanner() {
 
       <CourseFilter courses={courses} hidden={hidden} onToggle={setHidden} />
 
-      <div className="flex items-center justify-between rounded-2xl bg-surface p-3 shadow-card">
+      <div className="flex items-center justify-between gap-2 rounded-2xl bg-surface p-3 shadow-card">
+        {/* "Back to this week" sits at the leading edge, apart from the arrows,
+            the way a calendar's Today button does. Always rendered and disabled
+            when it would do nothing, so the arrows never shift position. */}
         <button
-          onClick={() => setWeekStart(addDaysIso(weekStart, -7))}
-          className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
-          aria-label="שבוע קודם"
+          onClick={() => setWeekStart(startOfWeekIso(today))}
+          disabled={onCurrentWeek}
+          title="חזרה לשבוע הנוכחי"
+          className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+            onCurrentWeek
+              ? 'cursor-default text-muted/50'
+              : 'bg-primary-soft text-primary hover:bg-primary hover:text-white'
+          }`}
         >
-          <CaretRight size={20} />
+          <ArrowCounterClockwise size={14} weight="bold" />
+          <span className="hidden sm:inline">חזרה לשבוע הנוכחי</span>
         </button>
-        {/* The range itself still returns to this week, but that was a hidden
-            affordance — the button says so out loud, and only when it applies. */}
-        <div className="flex items-center gap-2">
-          <button onClick={() => setWeekStart(startOfWeekIso(today))} className="text-sm font-semibold text-ink">
-            {weekRangeLabel(weekStart)}
+
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setWeekStart(addDaysIso(weekStart, -7))}
+            className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
+            aria-label="שבוע קודם"
+          >
+            <CaretRight size={20} />
           </button>
-          {!onCurrentWeek && (
-            <button
-              onClick={() => setWeekStart(startOfWeekIso(today))}
-              className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
-            >
-              השבוע
-            </button>
-          )}
+          <span className="min-w-0 text-center text-sm font-semibold text-ink">
+            {weekRangeLabel(weekStart)}
+          </span>
+          <button
+            onClick={() => setWeekStart(addDaysIso(weekStart, 7))}
+            className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
+            aria-label="שבוע הבא"
+          >
+            <CaretLeft size={20} />
+          </button>
         </div>
-        <button
-          onClick={() => setWeekStart(addDaysIso(weekStart, 7))}
-          className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
-          aria-label="שבוע הבא"
-        >
-          <CaretLeft size={20} />
-        </button>
       </div>
 
       <p className="px-1 text-xs text-muted">
@@ -139,7 +159,9 @@ export default function WeekPlanner() {
 
       <div className="grid gap-2.5 lg:grid-cols-7 lg:items-start">
         {days.map((iso, i) => {
-          const dayTasks = visible(schedule[iso] ?? [])
+          // A past day is empty here: anything still open from it lives in the
+          // overdue section below, so it never appears in two places at once.
+          const dayTasks = iso < today ? [] : visible(schedule[iso] ?? [])
           const dayExams = (examsByDay.get(iso) ?? []).filter((e) => !hidden.has(e.courseId))
           const isToday = iso === today
           const isPast = iso < today
@@ -205,6 +227,38 @@ export default function WeekPlanner() {
           )
         })}
       </div>
+
+      {/* Not a drop target: "overdue" is derived from the date, so there is
+          nothing meaningful about dragging a task *into* it. Drag out to a day,
+          or to the pool, or leave it here. */}
+      {overdueTasks.length > 0 && (
+        <div className="rounded-2xl bg-surface p-3 shadow-card ring-1 ring-accent/40">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink">
+              <WarningCircle size={16} className="text-accent" /> משימות שלא הושלמו
+            </h2>
+            <span className="text-[11px] tabular-nums text-muted">{overdueTasks.length}</span>
+          </div>
+          <p className="mb-2 text-[11px] text-muted">
+            עבר היום שתכננת להן. גרור ליום חדש, גרור למאגר, או השאר כאן.
+          </p>
+          <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+            {overdueTasks.map((t) => (
+              <PlannerChip
+                key={t.id}
+                task={t}
+                course={courseById.get(t.courseId)}
+                note={formatHeShort(t.dueDate!)}
+                onDragStart={() => setDragging(t.id)}
+                onDragMove={onDragMove}
+                onDrop={onDrop(t)}
+                onPick={() => setPicking(t)}
+                onToggle={() => toggleTask(t.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div
         ref={registerZone(POOL)}
@@ -325,6 +379,7 @@ function CourseGroup({
 function PlannerChip({
   task,
   course,
+  note,
   onDragStart,
   onDragMove,
   onDrop,
@@ -333,6 +388,8 @@ function PlannerChip({
 }: {
   task: Task
   course?: Course
+  /** Extra line under the title — the overdue list shows the day it was planned for. */
+  note?: string
   onDragStart: () => void
   onDragMove: (e: unknown, info: PanInfo) => void
   onDrop: (e: unknown, info: PanInfo) => void
@@ -382,6 +439,7 @@ function PlannerChip({
           {course ? `${course.name} · ` : ''}
           {formatDuration(task.minutes)}
         </span>
+        {note && <span className="block truncate text-[10px] leading-tight text-accent">תוכננה ל{note}</span>}
       </button>
     </motion.div>
   )
