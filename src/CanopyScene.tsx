@@ -50,33 +50,39 @@ export const SCENES: Record<ThemeKey, Scene> = {
     darkFilter: NIGHT,
     stars: true,
   },
-  // Anchors below trace the line painted into each illustration; tuned against
-  // the real art in the browser.
+  // The anchors below were calibrated against each illustration so the
+  // checkpoints land on the line that is actually painted there — the same way
+  // the forest's sit on the rope. riderDy is the sprite's own height as a % of
+  // the scene, so its board/skis rest on that line rather than float above it.
+  //
+  // sea: follows the wave crest.
   sea: {
     src: '/scene-sea.png',
     character: '/rider-surf.png',
-    a: { x: 150, y: 430 }, c: { x: 700, y: 420 }, b: { x: 1300, y: 470 },
+    a: { x: 140, y: 544 }, c: { x: 720, y: 371 }, b: { x: 1300, y: 500 },
     rope: null,
     riderW: 9,
-    riderDy: -15,
+    riderDy: -15.5,
     darkFilter: DUSK,
   },
+  // snow: follows the piste down the slope, ending before the right-hand trees.
   snow: {
     src: '/scene-snow.png',
     character: '/rider-ski.png',
-    a: { x: 150, y: 380 }, c: { x: 720, y: 470 }, b: { x: 1300, y: 520 },
+    a: { x: 140, y: 388 }, c: { x: 645, y: 479 }, b: { x: 1150, y: 639 },
     rope: null,
     riderW: 9,
-    riderDy: -15,
+    riderDy: -15.2,
     darkFilter: DUSK,
   },
+  // snowpark: passes over the rail, the box and the kicker in turn.
   snowpark: {
     src: '/scene-snowpark.png',
     character: '/rider-snowboard.png',
-    a: { x: 150, y: 360 }, c: { x: 700, y: 470 }, b: { x: 1300, y: 540 },
+    a: { x: 140, y: 381 }, c: { x: 630, y: 523 }, b: { x: 1120, y: 630 },
     rope: null,
     riderW: 9,
-    riderDy: -15,
+    riderDy: -14.7,
     darkFilter: DUSK,
   },
 }
