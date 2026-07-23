@@ -23,6 +23,7 @@ import {
   formatHeShort,
 } from '../utils'
 import { Sheet, CourseFilter } from '../ui'
+import { useCourseColor } from '../theme'
 import { goTo } from '../nav'
 
 const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
@@ -125,7 +126,7 @@ export default function WeekPlanner() {
           className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors ${
             onCurrentWeek
               ? 'cursor-default text-muted/50'
-              : 'bg-primary-soft text-primary hover:bg-primary hover:text-white'
+              : 'bg-primary-soft text-primary hover:bg-primary hover:text-on-primary'
           }`}
         >
           <ArrowCounterClockwise size={14} weight="bold" />
@@ -285,7 +286,7 @@ export default function WeekPlanner() {
             {tasks.length === 0 && (
               <button
                 onClick={() => goTo('courses')}
-                className="mt-2 rounded-lg bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+                className="mt-2 rounded-lg bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-on-primary"
               >
                 לקורסים
               </button>
@@ -341,6 +342,7 @@ function CourseGroup({
   onPick: (t: Task) => void
   onToggle: (id: string) => void
 }) {
+  const courseColor = useCourseColor()
   // <details> gives open/close, keyboard support and the disclosure semantics
   // for free — a hand-rolled toggle would be more code and less accessible.
   return (
@@ -351,7 +353,7 @@ function CourseGroup({
           weight="bold"
           className="shrink-0 text-muted transition-transform group-open:-rotate-90"
         />
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: course.color }} />
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: courseColor(course.color) }} />
         <span className="min-w-0 flex-1 truncate">
           {course.emoji} {course.name}
         </span>
@@ -396,6 +398,7 @@ function PlannerChip({
   onPick: () => void
   onToggle: () => void
 }) {
+  const courseColor = useCourseColor()
   // See tapGuard: swallows the stray click a drag release fires on a button.
   const guard = useRef(tapGuard()).current
   const tap = (fn: () => void) => () => {
@@ -422,8 +425,8 @@ function PlannerChip({
       exit={{ opacity: 0, scale: 0.96 }}
       className="relative flex touch-none items-center gap-1.5 rounded-lg border px-2 py-1.5 text-right shadow-sm"
       style={{
-        backgroundColor: (course?.color ?? '#4C7B39') + '14',
-        borderColor: (course?.color ?? '#4C7B39') + '66',
+        backgroundColor: courseColor(course?.color) + '14',
+        borderColor: courseColor(course?.color) + '66',
       }}
     >
       <button

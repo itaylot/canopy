@@ -51,7 +51,7 @@ export default function CalendarScreen() {
         <motion.button
           whileTap={{ scale: 0.92 }}
           onClick={() => setAddingExam(true)}
-          className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card"
+          className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-card"
         >
           <Plus weight="bold" size={16} /> מבחן
         </motion.button>
@@ -97,14 +97,14 @@ export default function CalendarScreen() {
                     .join(', ') || undefined
                 }
                 className={`relative flex min-h-14 flex-col items-center gap-0.5 rounded-xl px-0.5 pt-1.5 text-sm transition-colors ${
-                  isToday ? 'bg-primary font-bold text-white' : 'text-ink hover:bg-primary-soft'
+                  isToday ? 'bg-primary font-bold text-on-primary' : 'text-ink hover:bg-primary-soft'
                 }`}
               >
                 <span>{dayNum}</span>
                 {dayExams.length > 0 && (
                   <span
                     className={`w-full truncate rounded px-0.5 text-[8px] font-medium leading-tight ${
-                      isToday ? 'bg-white/25 text-white' : 'bg-accent-soft text-ink'
+                      isToday ? 'bg-on-primary/25 text-on-primary' : 'bg-accent-soft text-ink'
                     }`}
                   >
                     {examLabel(dayExams[0].title, courseById.get(dayExams[0].courseId)?.name)}
@@ -113,7 +113,7 @@ export default function CalendarScreen() {
                 {hasTasks && (
                   <span
                     className={`mt-auto mb-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-                      isToday ? 'bg-white' : 'bg-primary'
+                      isToday ? 'bg-on-primary' : 'bg-primary'
                     }`}
                   />
                 )}

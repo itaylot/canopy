@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
 import type { Course, Task } from './store'
 import { useToasts, type Toast as ToastType } from './toast'
+import { useCourseColor } from './theme'
 import { formatDuration } from './utils'
 
 /* ---------- Brand mark: two trees, a rope, a rider ---------- */
@@ -123,6 +124,7 @@ export function CourseFilter({
   hidden: Set<string>
   onToggle: (next: Set<string>) => void
 }) {
+  const courseColor = useCourseColor()
   if (courses.length === 0) return null
   const flip = (id: string) => {
     const next = new Set(hidden)
@@ -142,9 +144,9 @@ export function CourseFilter({
             className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-line transition-all ${
               on ? '' : 'opacity-40'
             }`}
-            style={{ backgroundColor: on ? c.color + '1a' : 'transparent' }}
+            style={{ backgroundColor: on ? courseColor(c.color) + '1a' : 'transparent' }}
           >
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: courseColor(c.color) }} />
             {c.emoji} {c.name}
           </button>
         )
@@ -177,6 +179,7 @@ export function TaskRow({
   /** Renders as a plain row (for lists inside one Card with dividers) instead of a standalone card. */
   flat?: boolean
 }) {
+  const courseColor = useCourseColor()
   return (
     <motion.div
       layout
@@ -192,7 +195,7 @@ export function TaskRow({
       <span
         aria-hidden
         className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-lg"
-        style={{ backgroundColor: (course?.color ?? '#4f8a55') + '1f' }}
+        style={{ backgroundColor: courseColor(course?.color) + '1f' }}
       >
         {course?.emoji ?? '📘'}
       </span>
@@ -422,7 +425,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       whileTap={{ scale: 0.97, y: 1 }}
-      className="w-full rounded-xl bg-primary py-3 font-semibold text-white shadow-card transition-shadow hover:shadow-lg"
+      className="w-full rounded-xl bg-primary py-3 font-semibold text-on-primary shadow-card transition-shadow hover:shadow-lg"
     >
       {children}
     </motion.button>

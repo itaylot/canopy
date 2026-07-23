@@ -320,7 +320,7 @@ function EmptyToday() {
       <p className="mt-1 text-sm text-muted">{state.note}</p>
       <button
         onClick={() => goTo(state.tab)}
-        className="mt-3 rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+        className="mt-3 rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-on-primary"
       >
         {state.action}
       </button>
@@ -413,7 +413,7 @@ function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; t
             <div key={iso} className="relative py-1">
               <span
                 className={`mx-auto grid h-6 w-6 place-items-center rounded-full tabular-nums ${
-                  isToday ? 'bg-primary font-bold text-white' : 'text-ink'
+                  isToday ? 'bg-primary font-bold text-on-primary' : 'text-ink'
                 }`}
               >
                 {dayOfMonth(iso)}
@@ -495,7 +495,7 @@ function FocusTimer({ className = '' }: { className?: string }) {
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={() => setRunning((r) => !r)}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
           >
             {running ? <Pause weight="fill" size={16} /> : <Play weight="fill" size={16} />}
             {running ? 'עצור' : left === FOCUS_MINUTES * 60 ? 'התחל' : 'המשך'}

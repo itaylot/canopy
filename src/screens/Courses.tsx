@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Plus, Trash, PencilSimple } from '@phosphor-icons/react'
-import { useStore, captureCourse, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
+import { useStore, captureCourse, COURSE_PALETTES, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
 import { toast } from '../toast'
 import { goTo } from '../nav'
+import { useCourseColor } from '../theme'
 import {
   todayIso,
   formatHeShort,
@@ -20,6 +21,7 @@ export default function Courses() {
   const [open, setOpen] = useState<Course | null>(null)
   const [adding, setAdding] = useState(false)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
+  const courseColor = useCourseColor()
 
   const statFor = (courseId: string) => {
     const list = tasks.filter((t) => t.courseId === courseId)
@@ -58,7 +60,7 @@ export default function Courses() {
         <motion.button
           whileTap={{ scale: 0.92 }}
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card"
+          className="flex items-center gap-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-card"
         >
           <Plus weight="bold" size={16} /> קורס
         </motion.button>
@@ -88,7 +90,7 @@ export default function Courses() {
                 <button onClick={() => setOpen(c)} className="flex min-w-0 flex-1 items-center gap-3 text-right">
                   <span
                     className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-xl"
-                    style={{ backgroundColor: c.color + '1f' }}
+                    style={{ backgroundColor: courseColor(c.color) + '1f' }}
                   >
                     {c.emoji}
                   </span>
@@ -118,7 +120,7 @@ export default function Courses() {
                   initial={false}
                   animate={{ width: `${pct}%` }}
                   transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-                  style={{ backgroundColor: c.color }}
+                  style={{ backgroundColor: courseColor(c.color) }}
                 />
               </div>
             </motion.div>
@@ -355,6 +357,10 @@ function CourseFormBody({
 }) {
   const [name, setName] = useState(editing?.name ?? '')
   const [emoji, setEmoji] = useState(editing?.emoji ?? COURSE_EMOJIS[0])
+  // Swatches show the active theme's palette, but the value stored stays the
+  // canonical (forest) hex — themedCourseColor maps it back on render, so a
+  // course picked under one theme still reads correctly under another.
+  const theme = useStore((s) => s.theme)
   const [color, setColor] = useState(editing?.color ?? COURSE_COLORS[0])
 
   const submit = () => {
@@ -385,14 +391,14 @@ function CourseFormBody({
       </Field>
       <Field label="צבע">
         <div className="flex gap-2">
-          {COURSE_COLORS.map((c) => (
+          {COURSE_COLORS.map((c, i) => (
             <button
               key={c}
               onClick={() => setColor(c)}
               className={`h-9 w-9 rounded-full transition-transform hover:scale-110 ${
                 color === c ? 'ring-2 ring-ink ring-offset-2 ring-offset-surface' : ''
               }`}
-              style={{ backgroundColor: c }}
+              style={{ backgroundColor: COURSE_PALETTES[theme][i] }}
             />
           ))}
         </div>

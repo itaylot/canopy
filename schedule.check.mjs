@@ -6,11 +6,12 @@
 // passed — the checks were testing their own copy. Import only from modules
 // with no JSX and no browser APIs.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { buildSchedule, unscheduled, scheduled, overdue, dayLoad } from './src/schedule.ts'
 import { addDaysIso, examLabel } from './src/utils.ts'
 import { zoneAt, tapGuard } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
-import { isDark, normalizeThemeMode } from './src/store.ts'
+import { isDark, normalizeThemeMode, themedCourseColor, COURSE_PALETTES } from './src/store.ts'
 
 const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
@@ -335,4 +336,78 @@ assert.deepEqual(
   'garbage falls back to defaults',
 )
 
-console.log('schedule.check.mjs: all 33 checks passed ✓')
+
+/* ---------------------------------------------------------------------------
+ * Palette contrast (parses the real src/index.css)
+ *
+ * White-on-primary measured 2.5-3.3 in every dark theme before --on-primary
+ * existed — a primary action nobody could read. These assertions keep any
+ * future palette edit from quietly reintroducing that.
+ * ------------------------------------------------------------------------- */
+const cssText = readFileSync(new URL('./src/index.css', import.meta.url), 'utf8')
+
+const palettes = {}
+for (const m of cssText.matchAll(/:root([^{]*)\{([^}]*)\}/g)) {
+  const sel = m[1].trim()
+  const theme = (/data-theme=.(\w+)./.exec(sel) || [])[1] || 'forest'
+  const key = theme + (/data-mode=.dark./.test(sel) ? '/dark' : '/light')
+  palettes[key] = palettes[key] || {}
+  for (const v of m[2].matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/gi)) palettes[key][v[1]] = v[2]
+}
+
+const channel = (c) => (c / 255 <= 0.03928 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4)
+const luminance = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+}
+const contrast = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p)
+  return (x + 0.05) / (y + 0.05)
+}
+
+// 34. Every theme, in both modes, clears WCAG AA (4.5) on the text pairs that
+//     carry the interface — including the label on the primary button.
+const AA = 4.5
+for (const [name, p] of Object.entries(palettes)) {
+  if (!p.ink) continue
+  const light = name.endsWith('/light')
+  const onPrimary = p['on-primary'] ?? (light ? palettes['forest/light']['on-primary'] : palettes['forest/dark']['on-primary'])
+  const pairs = [
+    ['body text', p.ink, p.surface],
+    ['text on page', p.ink, p.bg],
+    ['secondary text', p.muted, p.surface],
+    ['active nav item', p.primary, p['primary-soft']],
+    ['primary button label', onPrimary, p.primary],
+  ]
+  for (const [what, fg, bg] of pairs) {
+    if (!fg || !bg) continue
+    const r = contrast(fg, bg)
+    assert.ok(r >= AA, `${name} ${what}: ${r.toFixed(2)} is below AA (${AA})`)
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Course colours follow the theme without touching stored data
+ * ------------------------------------------------------------------------- */
+
+// 35. A course keeps its slot: the hex it was saved with maps to the same
+//     position in whichever theme is active, so identity survives a theme swap.
+const slot2 = COURSE_PALETTES.forest[2]
+assert.equal(themedCourseColor(slot2, 'forest'), COURSE_PALETTES.forest[2])
+assert.equal(themedCourseColor(slot2, 'sea'), COURSE_PALETTES.sea[2])
+assert.equal(themedCourseColor(slot2, 'snow'), COURSE_PALETTES.snow[2])
+
+// 36. Case-insensitive (stored hexes have varied in case), and an unrecognised
+//     colour is passed straight through rather than being remapped or lost.
+assert.equal(themedCourseColor(slot2.toLowerCase(), 'sea'), COURSE_PALETTES.sea[2])
+assert.equal(themedCourseColor('#123456', 'sea'), '#123456', 'unknown colour survives')
+assert.equal(themedCourseColor(undefined, 'sea'), COURSE_PALETTES.sea[0], 'missing falls back')
+
+// 37. Every theme offers the same number of distinct slots.
+for (const [name, list] of Object.entries(COURSE_PALETTES)) {
+  assert.equal(list.length, COURSE_PALETTES.forest.length, `${name} palette length`)
+  assert.equal(new Set(list.map((c) => c.toLowerCase())).size, list.length, `${name} has no duplicates`)
+}
+
+console.log('schedule.check.mjs: all 37 checks passed ✓')

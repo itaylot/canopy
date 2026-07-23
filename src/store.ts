@@ -17,7 +17,29 @@ export type Exam = { id: string; courseId: string; title: string; date: string }
 // Course identity colors drawn from the locked brand palette (Fern, Olive
 // Bark, Golden Earth, Camel, Lime Moss 2, lightened Prussian). The goldenrod
 // --accent stays reserved for "what's next", never a course identity.
-export const COURSE_COLORS = ['#4C7B39', '#714F21', '#8A5D1F', '#CA9D59', '#88A431', '#2E4A68']
+/**
+ * Course identity colours, one row per theme and index-aligned.
+ *
+ * A course stores the hex it was created with, so nothing here migrates data:
+ * `themedCourseColor` looks the stored value up by position and returns the
+ * current theme's colour at that slot. A course keeps its identity while the
+ * palette follows the theme; a hex we don't recognise is simply used as-is.
+ */
+export const COURSE_PALETTES: Record<ThemeKey, string[]> = {
+  forest: ['#4C7B39', '#714F21', '#8A5D1F', '#CA9D59', '#88A431', '#2E4A68'],
+  sea: ['#14746C', '#B5794A', '#D97E46', '#E0A35C', '#2F9E93', '#245F7A'],
+  snow: ['#2F6A99', '#B07D4A', '#CF7F3C', '#D9A45E', '#5B8F6A', '#3F5D7D'],
+  snowpark: ['#4A51C9', '#B07D4A', '#EC5C33', '#E0925C', '#5B8F6A', '#3D4A8A'],
+}
+
+/** The palette offered when creating a course — always the active theme's. */
+export const COURSE_COLORS = COURSE_PALETTES.forest
+
+export function themedCourseColor(stored: string | undefined, theme: ThemeKey): string {
+  if (!stored) return COURSE_PALETTES[theme][0]
+  const i = COURSE_PALETTES.forest.findIndex((c) => c.toLowerCase() === stored.toLowerCase())
+  return i === -1 ? stored : COURSE_PALETTES[theme][i]
+}
 export const COURSE_EMOJIS = ['📐', '🧠', '📖', '⚗️', '💻', '🎨', '🧬', '📊', '🗺️', '🎵']
 
 /** The place: drives the palette, the home-screen scene and the sidebar art. */

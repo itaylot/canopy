@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useStore, isDark, type ThemeKey } from './store'
+import { useStore, isDark, themedCourseColor, type ThemeKey } from './store'
 
 /** Label + sidebar-banner art per theme. The scene illustration (background,
  *  character, rope anchors) lives in CanopyScene, keyed by the same ThemeKey. */
@@ -29,6 +29,11 @@ export function useApplyTheme() {
     const apply = () => {
       root.dataset.theme = theme
       root.dataset.mode = isDark(mode, systemDark()) ? 'dark' : 'light'
+      // The browser chrome / PWA status bar is painted from this meta tag; read
+      // the resolved token so it always matches whatever the palette just became.
+      const meta = document.querySelector('meta[name="theme-color"]')
+      const bg = getComputedStyle(root).getPropertyValue('--bg').trim()
+      if (meta && bg) meta.setAttribute('content', bg)
     }
     apply()
     try {
@@ -57,4 +62,10 @@ export function useResolvedDark(): boolean {
     return () => mq.removeEventListener('change', h)
   }, [])
   return isDark(mode, sys)
+}
+
+/** Maps a course's stored colour onto the active theme's palette. */
+export function useCourseColor() {
+  const theme = useStore((s) => s.theme)
+  return (stored?: string) => themedCourseColor(stored, theme)
 }

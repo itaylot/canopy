@@ -12,6 +12,7 @@
   --color-muted: var(--muted);
   --color-primary: var(--primary);
   --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-bark: var(--bark);
@@ -40,7 +41,7 @@
   --ink: #042544;
   --muted: #6f7566;
   --primary: #4c7b39;
-  --primary-soft: #e9f0de;
+  --primary-soft: #f1f7ea;
   --tree-2: #88a431;
   --bark: #714f21;
   --accent: #b88a3e;
@@ -53,7 +54,7 @@
   --bg: #eef4f2;
   --surface: #fbfdfc;
   --ink: #06283a;
-  --muted: #5f7d80;
+  --muted: #4f6b6e;
   --primary: #14746c;
   --primary-soft: #d7ebe7;
   --tree-2: #2f9e93;
@@ -68,7 +69,7 @@
   --bg: #e9eef3;
   --surface: #f7fafc;
   --ink: #12283a;
-  --muted: #647889;
+  --muted: #566b7b;
   --primary: #2f6a99;
   --primary-soft: #dbe8f3;
   --tree-2: #5b8f6a;
@@ -95,6 +96,7 @@
 
 /* light-mode chrome, shared by every theme */
 :root {
+  --on-primary: #ffffff;
   --shadow: 0 1px 2px rgb(4 37 68 / 0.04), 0 8px 24px rgb(4 37 68 / 0.06);
   color-scheme: light;
 }
@@ -102,6 +104,7 @@
 /* ---- forest · dark ------------------------------------------------------- */
 :root[data-mode='dark'],
 :root[data-theme='forest'][data-mode='dark'] {
+  --on-primary: #061829;
   --bg: #061829;
   --surface: #0c2338;
   --ink: #f1f3ea;
@@ -117,6 +120,7 @@
 
 /* ---- sea · dark ---------------------------------------------------------- */
 :root[data-theme='sea'][data-mode='dark'] {
+  --on-primary: #04222e;
   --bg: #04222e;
   --surface: #0a2f3d;
   --ink: #e6f1ef;
@@ -132,6 +136,7 @@
 
 /* ---- snow · dark --------------------------------------------------------- */
 :root[data-theme='snow'][data-mode='dark'] {
+  --on-primary: #0b1a26;
   --bg: #0b1a26;
   --surface: #12293a;
   --ink: #eaf1f6;
@@ -147,12 +152,13 @@
 
 /* ---- snowpark · dark ----------------------------------------------------- */
 :root[data-theme='snowpark'][data-mode='dark'] {
+  --on-primary: #0f1226;
   --bg: #0f1226;
   --surface: #1a1e3a;
   --ink: #e9eaf6;
   --muted: #9096b4;
   --primary: #7d82ee;
-  --primary-soft: #23264a;
+  --primary-soft: #1c1f3e;
   --tree-2: #79ad86;
   --bark: #cf9a5f;
   --accent: #ff7a54;
