@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, type ComponentType } from 'react'
 import { motion } from 'motion/react'
 import { House, CalendarBlank, BookOpen, User, Kanban } from '@phosphor-icons/react'
 import type { User as FirebaseUser } from 'firebase/auth'
@@ -13,9 +13,10 @@ import { isConfigured } from './firebaseConfig'
 import { useAuth, useCloudSync } from './cloud'
 import { registerSW, applyUpdate } from './registerSW'
 import { toast } from './toast'
+import { useNav, type TabKey } from './nav'
 
 // `short` is the mobile dock label — five tabs leave little room on a phone.
-const TABS = [
+const TABS: { key: TabKey; label: string; short: string; Icon: typeof House; Screen: ComponentType }[] = [
   { key: 'home', label: 'בית', short: 'בית', Icon: House, Screen: Home },
   { key: 'plan', label: 'תכנון שבוע', short: 'תכנון', Icon: Kanban, Screen: WeekPlanner },
   { key: 'schedule', label: 'לוח זמנים', short: 'לו״ז', Icon: CalendarBlank, Screen: CalendarScreen },
@@ -51,7 +52,7 @@ export default function App() {
 }
 
 function MainApp({ user }: { user: FirebaseUser }) {
-  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('home')
+  const { tab, setTab } = useNav()
   const active = TABS.find((t) => t.key === tab)!
 
   return (

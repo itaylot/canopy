@@ -35,6 +35,20 @@ export const formatHeShort = (iso: string) => heShort.format(parseIso(iso))
 export const monthLabel = (year: number, month: number) =>
   new Intl.DateTimeFormat('he-IL', { month: 'long', year: 'numeric' }).format(new Date(year, month, 1))
 
+/**
+ * A month grid, Sunday-first: leading blanks to line the 1st up under its
+ * weekday, then every day of the month. Shared by the calendar screen and the
+ * mini month on the home screen, which built the identical grid separately.
+ */
+export function monthCells(year: number, month: number): (string | null)[] {
+  const first = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const out: (string | null)[] = []
+  for (let i = 0; i < first.getDay(); i++) out.push(null)
+  for (let d = 1; d <= daysInMonth; d++) out.push(toIso(new Date(year, month, d)))
+  return out
+}
+
 const heMonthShort = new Intl.DateTimeFormat('he-IL', { month: 'short' })
 export const monthShortHe = (iso: string) => heMonthShort.format(parseIso(iso))
 export const dayOfMonth = (iso: string) => Number(iso.slice(-2))
@@ -72,7 +86,14 @@ export const examLabel = (title: string, courseName?: string) => {
 // Tasks are stored in minutes (that's what the scheduler and daily cap use),
 // but people think in hours — these format/pick helpers keep the UI hour-based
 // without touching the underlying data model.
+/** How long a single task takes. Capped at six hours — beyond that it should
+ *  be split into several tasks rather than planned as one block. */
 export const DURATION_OPTIONS_MIN = [30, 60, 90, 120, 150, 180, 240, 300, 360]
+
+/** How much to study in a day. A separate list from the task lengths above:
+ *  a twelve-hour day is a reasonable target during exam period, but a
+ *  twelve-hour single task is not. */
+export const DAILY_CAP_OPTIONS_MIN = [60, 90, 120, 150, 180, 240, 300, 360, 420, 480, 540, 600, 720]
 
 export function formatDuration(minutes: number): string {
   const h = minutes / 60

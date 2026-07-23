@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { SignOut, CloudCheck, Sun, Moon, Sparkle, DownloadSimple } from '@phosphor-icons/react'
 import { useStore, type SceneKey } from '../store'
 import { auth, logOut } from '../firebase'
-import { formatDuration, todayIso, DURATION_OPTIONS_MIN } from '../utils'
+import { formatDuration, todayIso, DAILY_CAP_OPTIONS_MIN } from '../utils'
 import { buildSchedule } from '../schedule'
 import { buildIcs, downloadIcs } from '../ics'
 import { Card, Field, inputClass } from '../ui'
@@ -66,7 +66,7 @@ export default function Profile() {
             value={dailyCap}
             onChange={(e) => setDailyCap(Number(e.target.value))}
           >
-            {DURATION_OPTIONS_MIN.filter((m) => m >= 60).map((m) => (
+            {DAILY_CAP_OPTIONS_MIN.map((m) => (
               <option key={m} value={m}>
                 {formatDuration(m)}
               </option>

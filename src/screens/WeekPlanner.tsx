@@ -15,6 +15,7 @@ import {
   dayOfMonth,
 } from '../utils'
 import { Sheet, CourseFilter } from '../ui'
+import { goTo } from '../nav'
 
 const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 
@@ -50,6 +51,7 @@ export default function WeekPlanner() {
     () => Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i)),
     [weekStart],
   )
+  const onCurrentWeek = weekStart === startOfWeekIso(today)
 
   // Everything still waiting for a day, grouped by course so a long list stays
   // navigable. Courses with nothing waiting are left out entirely.
@@ -107,9 +109,21 @@ export default function WeekPlanner() {
         >
           <CaretRight size={20} />
         </button>
-        <button onClick={() => setWeekStart(startOfWeekIso(today))} className="text-sm font-semibold text-ink">
-          {weekRangeLabel(weekStart)}
-        </button>
+        {/* The range itself still returns to this week, but that was a hidden
+            affordance — the button says so out loud, and only when it applies. */}
+        <div className="flex items-center gap-2">
+          <button onClick={() => setWeekStart(startOfWeekIso(today))} className="text-sm font-semibold text-ink">
+            {weekRangeLabel(weekStart)}
+          </button>
+          {!onCurrentWeek && (
+            <button
+              onClick={() => setWeekStart(startOfWeekIso(today))}
+              className="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+            >
+              השבוע
+            </button>
+          )}
+        </div>
         <button
           onClick={() => setWeekStart(addDaysIso(weekStart, 7))}
           className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
@@ -208,9 +222,21 @@ export default function WeekPlanner() {
         </div>
 
         {poolCount === 0 ? (
-          <p className="py-3 text-center text-xs text-muted">
-            כל המשימות משובצות. משימות חדשות יופיעו כאן עד שתשבץ אותן.
-          </p>
+          <div className="py-3 text-center">
+            <p className="text-xs text-muted">
+              {tasks.length === 0
+                ? 'אין עדיין משימות. הוסף אותן בטאב הקורסים והן ימתינו כאן.'
+                : 'כל המשימות משובצות. משימות חדשות יופיעו כאן עד שתשבץ אותן.'}
+            </p>
+            {tasks.length === 0 && (
+              <button
+                onClick={() => goTo('courses')}
+                className="mt-2 rounded-lg bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+              >
+                לקורסים
+              </button>
+            )}
+          </div>
         ) : (
           <div className="space-y-1.5">
             {pool.map(({ course, items }) => (

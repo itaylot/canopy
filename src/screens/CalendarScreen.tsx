@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 import { CaretRight, CaretLeft, Plus } from '@phosphor-icons/react'
 import { useStore, type Course, type Exam, type Task } from '../store'
 import { buildSchedule } from '../schedule'
-import { todayIso, toIso, monthLabel, formatHe, examLabel } from '../utils'
+import { todayIso, monthLabel, formatHe, examLabel, monthCells } from '../utils'
 import { toast } from '../toast'
 import { Sheet, TaskRow, Field, inputClass, PrimaryButton, RowMenu, CourseFilter } from '../ui'
 
@@ -39,15 +39,7 @@ export default function CalendarScreen() {
   const visibleTasksOf = (iso: string) => (schedule[iso] ?? []).filter((t) => !hidden.has(t.courseId))
   const visibleExamsOf = (iso: string) => (examsByDay.get(iso) ?? []).filter((e) => !hidden.has(e.courseId))
 
-  // Build the month grid: leading blanks (Sunday-first week) + all days.
-  const cells = useMemo(() => {
-    const first = new Date(year, month, 1)
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const out: (string | null)[] = []
-    for (let i = 0; i < first.getDay(); i++) out.push(null)
-    for (let d = 1; d <= daysInMonth; d++) out.push(toIso(new Date(year, month, d)))
-    return out
-  }, [year, month])
+  const cells = useMemo(() => monthCells(year, month), [year, month])
 
   const stepMonth = (delta: number) => {
     const d = new Date(year, month + delta, 1)
@@ -71,77 +63,77 @@ export default function CalendarScreen() {
       <CourseFilter courses={courses} hidden={hidden} onToggle={setHidden} />
 
       <div className="rounded-2xl bg-surface p-4 shadow-card">
-          <div className="mb-3 flex items-center justify-between">
-            {/* In RTL, "previous" sits on the right visually */}
-            <button onClick={() => stepMonth(-1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש קודם">
-              <CaretRight size={20} />
-            </button>
-            <span className="font-semibold text-ink">{monthLabel(year, month)}</span>
-            <button onClick={() => stepMonth(1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש הבא">
-              <CaretLeft size={20} />
-            </button>
-          </div>
-
-          <div className="mb-1 grid grid-cols-7 text-center text-xs text-muted">
-            {WEEKDAYS.map((w) => (
-              <div key={w} className="py-1">
-                {w}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((iso, i) => {
-              if (!iso) return <div key={i} />
-              const dayNum = Number(iso.slice(-2))
-              const hasTasks = visibleTasksOf(iso).length > 0
-              const dayExams = visibleExamsOf(iso)
-              const isToday = iso === today
-              return (
-                <motion.button
-                  key={iso}
-                  whileTap={{ scale: 0.92 }}
-                  onClick={() => setSelected(iso)}
-                  title={
-                    dayExams
-                      .map((e) => examLabel(e.title, courseById.get(e.courseId)?.name))
-                      .join(', ') || undefined
-                  }
-                  className={`relative flex min-h-14 flex-col items-center gap-0.5 rounded-xl px-0.5 pt-1.5 text-sm transition-colors ${
-                    isToday ? 'bg-primary font-bold text-white' : 'text-ink hover:bg-primary-soft'
-                  }`}
-                >
-                  <span>{dayNum}</span>
-                  {dayExams.length > 0 && (
-                    <span
-                      className={`w-full truncate rounded px-0.5 text-[8px] font-medium leading-tight ${
-                        isToday ? 'bg-white/25 text-white' : 'bg-accent-soft text-ink'
-                      }`}
-                    >
-                      {examLabel(dayExams[0].title, courseById.get(dayExams[0].courseId)?.name)}
-                    </span>
-                  )}
-                  {hasTasks && (
-                    <span
-                      className={`mt-auto mb-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-                        isToday ? 'bg-white' : 'bg-primary'
-                      }`}
-                    />
-                  )}
-                </motion.button>
-              )
-            })}
-          </div>
-
-          <div className="mt-3 flex justify-center gap-4 text-xs text-muted">
-            <span className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded bg-accent-soft" /> מבחן
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-primary" /> משימות
-            </span>
-          </div>
+        <div className="mb-3 flex items-center justify-between">
+          {/* In RTL, "previous" sits on the right visually */}
+          <button onClick={() => stepMonth(-1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש קודם">
+            <CaretRight size={20} />
+          </button>
+          <span className="font-semibold text-ink">{monthLabel(year, month)}</span>
+          <button onClick={() => stepMonth(1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש הבא">
+            <CaretLeft size={20} />
+          </button>
         </div>
+
+        <div className="mb-1 grid grid-cols-7 text-center text-xs text-muted">
+          {WEEKDAYS.map((w) => (
+            <div key={w} className="py-1">
+              {w}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((iso, i) => {
+            if (!iso) return <div key={i} />
+            const dayNum = Number(iso.slice(-2))
+            const hasTasks = visibleTasksOf(iso).length > 0
+            const dayExams = visibleExamsOf(iso)
+            const isToday = iso === today
+            return (
+              <motion.button
+                key={iso}
+                whileTap={{ scale: 0.92 }}
+                onClick={() => setSelected(iso)}
+                title={
+                  dayExams
+                    .map((e) => examLabel(e.title, courseById.get(e.courseId)?.name))
+                    .join(', ') || undefined
+                }
+                className={`relative flex min-h-14 flex-col items-center gap-0.5 rounded-xl px-0.5 pt-1.5 text-sm transition-colors ${
+                  isToday ? 'bg-primary font-bold text-white' : 'text-ink hover:bg-primary-soft'
+                }`}
+              >
+                <span>{dayNum}</span>
+                {dayExams.length > 0 && (
+                  <span
+                    className={`w-full truncate rounded px-0.5 text-[8px] font-medium leading-tight ${
+                      isToday ? 'bg-white/25 text-white' : 'bg-accent-soft text-ink'
+                    }`}
+                  >
+                    {examLabel(dayExams[0].title, courseById.get(dayExams[0].courseId)?.name)}
+                  </span>
+                )}
+                {hasTasks && (
+                  <span
+                    className={`mt-auto mb-1 h-1.5 w-1.5 shrink-0 rounded-full ${
+                      isToday ? 'bg-white' : 'bg-primary'
+                    }`}
+                  />
+                )}
+              </motion.button>
+            )
+          })}
+        </div>
+
+        <div className="mt-3 flex justify-center gap-4 text-xs text-muted">
+          <span className="flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded bg-accent-soft" /> מבחן
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-primary" /> משימות
+          </span>
+        </div>
+      </div>
 
       <DaySheet
         iso={selected}

@@ -11,7 +11,7 @@ import {
   CalendarCheck,
 } from '@phosphor-icons/react'
 import { useStore } from '../store'
-import { buildSchedule } from '../schedule'
+import { buildSchedule, unscheduled } from '../schedule'
 import {
   todayIso,
   toIso,
@@ -22,10 +22,12 @@ import {
   formatDuration,
   monthLabel,
   examLabel,
+  monthCells,
 } from '../utils'
 import { TaskRow, LeafBurst, Card } from '../ui'
 import { CanopyScene } from '../CanopyScene'
 import { auth } from '../firebase'
+import { goTo } from '../nav'
 
 export default function Home() {
   const { tasks, exams, courses, toggleTask } = useStore()
@@ -104,12 +106,9 @@ export default function Home() {
               </motion.div>
             )}
 
-            {total === 0 && (
-              <div className="px-4 py-8 text-center">
-                <p className="text-ink">אין משימות מתוכננות להיום.</p>
-                <p className="mt-1 text-sm text-muted">הוסף משימות בטאב הקורסים והן ישובצו לכאן.</p>
-              </div>
-            )}
+            {/* An empty day means different things depending on how far along
+                the setup is, so it points at the step that is actually next. */}
+            {total === 0 && <EmptyToday />}
 
             {doneToday.length > 0 && pendingToday.length > 0 && (
               <div className="pt-2">
@@ -176,6 +175,59 @@ export default function Home() {
   )
 }
 
+/**
+ * The empty day, phrased for wherever the user actually is.
+ *
+ * "No tasks planned for today" is true in four very different situations, and
+ * the useful thing to say — and to offer a way to — differs in each.
+ */
+function EmptyToday() {
+  const { courses, tasks } = useStore()
+  const waiting = unscheduled(tasks).length
+
+  const state =
+    courses.length === 0
+      ? {
+          title: 'נתחיל מקורס אחד.',
+          note: 'כל משימה שייכת לקורס, אז זה הצעד הראשון.',
+          action: 'צור קורס' as const,
+          tab: 'courses' as const,
+        }
+      : tasks.length === 0
+        ? {
+            title: 'יש קורסים, אין עדיין משימות.',
+            note: 'הוסף את כל המשימות של הקורס בבת אחת — השיבוץ מגיע אחר כך.',
+            action: 'הוסף משימות',
+            tab: 'courses' as const,
+          }
+        : waiting > 0
+          ? {
+              title: `${waiting === 1 ? 'משימה אחת ממתינה' : `${waiting} משימות ממתינות`} לשיבוץ.`,
+              note: 'מה שתשבץ להיום יופיע כאן.',
+              action: 'תכנן את השבוע',
+              tab: 'plan' as const,
+            }
+          : {
+              title: 'אין משימות להיום.',
+              note: 'הכול משובץ לימים אחרים — יום פנוי הוא תוצאה תקינה.',
+              action: 'לתכנון השבוע',
+              tab: 'plan' as const,
+            }
+
+  return (
+    <div className="px-4 py-8 text-center">
+      <p className="text-ink">{state.title}</p>
+      <p className="mt-1 text-sm text-muted">{state.note}</p>
+      <button
+        onClick={() => goTo(state.tab)}
+        className="mt-3 rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white"
+      >
+        {state.action}
+      </button>
+    </div>
+  )
+}
+
 function greetingHe() {
   const h = new Date().getHours()
   if (h < 5) return 'לילה טוב'
@@ -197,7 +249,9 @@ function WeeklySummary() {
   const activeDays = new Set(doneThisWeek.map((t) => t.completedAt)).size
 
   const rows = [
-    { Icon: BookOpen, value: minutes > 0 ? formatDuration(minutes) : '0', label: 'זמן למידה השבוע' },
+    // Not measured time: this is the planned length of the tasks that were
+    // ticked off. Calling it "study time" overstated what the number knows.
+    { Icon: BookOpen, value: minutes > 0 ? formatDuration(minutes) : '0', label: 'זמן מתוכנן שהושלם' },
     { Icon: CheckCircle, value: String(doneThisWeek.length), label: 'משימות הושלמו' },
     { Icon: CalendarCheck, value: String(activeDays), label: 'ימים פעילים' },
   ]
@@ -233,14 +287,7 @@ function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; t
   const month = now.getMonth()
 
   const examDays = useMemo(() => new Set(exams.map((e) => e.date)), [exams])
-  const cells = useMemo(() => {
-    const first = new Date(year, month, 1)
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const out: (string | null)[] = []
-    for (let i = 0; i < first.getDay(); i++) out.push(null)
-    for (let d = 1; d <= daysInMonth; d++) out.push(toIso(new Date(year, month, d)))
-    return out
-  }, [year, month])
+  const cells = useMemo(() => monthCells(year, month), [year, month])
 
   return (
     <Card className="hidden p-4 lg:block">

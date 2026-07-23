@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Plus, Trash } from '@phosphor-icons/react'
 import { useStore, captureCourse, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
 import { toast } from '../toast'
+import { goTo } from '../nav'
 import {
   todayIso,
   formatHeShort,
@@ -163,6 +164,10 @@ function CourseDetail({
   // Editing reuses the same inline form rather than opening a second sheet on
   // top of this one — nested bottom sheets are awkward to dismiss on mobile.
   const [editingId, setEditingId] = useState<string | null>(null)
+  // How many were added in this sitting — feedback while typing a batch, reset
+  // whenever the sheet opens on a course.
+  const [added, setAdded] = useState(0)
+  const titleRef = useRef<HTMLInputElement>(null)
 
   const list = useMemo(
     () => (course ? tasks.filter((t) => t.courseId === course.id) : []),
@@ -178,6 +183,14 @@ function CourseDetail({
     setMinutes(60)
   }
 
+  // Opening the sheet on a different course starts a fresh sitting.
+  useEffect(() => {
+    setAdded(0)
+    setEditingId(null)
+    setTitle('')
+    setMinutes(60)
+  }, [course?.id])
+
   const startEdit = (id: string) => {
     const t = list.find((x) => x.id === id)
     if (!t) return
@@ -186,15 +199,25 @@ function CourseDetail({
     setMinutes(t.minutes)
   }
 
-  // A task is created without a day and is auto-scheduled; the week planner is
-  // the only place that pins one. dueDate is deliberately absent from the patch
-  // so editing a task's title or length never unpins the day it was given.
+  // A task is created without a day; the week planner is the only place that
+  // pins one. dueDate is deliberately absent from the patch, so editing a
+  // task's title or length never unpins the day it was given.
+  //
+  // Adding is built for entering a course's whole workload in one sitting: the
+  // form stays open, only the title clears, the length carries over to the next
+  // one, and focus returns to the title so you can just keep typing.
   const submit = () => {
     if (!course || !title.trim()) return
     const fields = { title: title.trim(), minutes }
-    if (editingId) updateTask(editingId, fields)
-    else addTask({ courseId: course.id, ...fields })
-    reset()
+    if (editingId) {
+      updateTask(editingId, fields)
+      reset()
+      return
+    }
+    addTask({ courseId: course.id, ...fields })
+    setTitle('')
+    setAdded((n) => n + 1)
+    titleRef.current?.focus()
   }
 
   return (
@@ -232,9 +255,11 @@ function CourseDetail({
           <div className={`rounded-2xl border p-3 ${editingId ? 'border-primary bg-primary-soft/30' : 'border-line'}`}>
             <Field label={editingId ? 'עריכת משימה' : 'משימה חדשה'}>
               <input
+                ref={titleRef}
                 className={inputClass}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submit()}
                 placeholder="למשל: לפתור תרגיל 5"
               />
             </Field>
@@ -255,6 +280,23 @@ function CourseDetail({
               <button onClick={reset} className="mt-2 w-full py-1.5 text-sm text-muted transition-colors hover:text-ink">
                 ביטול
               </button>
+            )}
+
+            {!editingId && added > 0 && (
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-line/70 pt-2.5">
+                <span className="text-xs text-muted">
+                  {added === 1 ? 'נוספה משימה אחת' : `נוספו ${added} משימות`}
+                </span>
+                <button
+                  onClick={() => {
+                    onClose()
+                    goTo('plan')
+                  }}
+                  className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary-soft"
+                >
+                  לתכנון השבוע ←
+                </button>
+              </div>
             )}
           </div>
 
