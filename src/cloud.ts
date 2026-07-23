@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './firebase'
-import { useStore } from './store'
+import { useStore, normalizeThemeMode } from './store'
 import { toast, useToasts } from './toast'
 
 export function useAuth() {
@@ -24,7 +24,8 @@ const dataOf = (s: ReturnType<typeof useStore.getState>) => ({
   tasks: s.tasks,
   exams: s.exams,
   dailyCap: s.dailyCap,
-  scene: s.scene,
+  theme: s.theme,
+  mode: s.mode,
 })
 
 const localState = () => dataOf(useStore.getState())
@@ -80,7 +81,8 @@ export function useCloudSync(user: User | null) {
           tasks: d.tasks ?? [],
           exams: d.exams ?? [],
           dailyCap: d.dailyCap ?? 180,
-          scene: d.scene ?? 'auto',
+          // Splits/migrates the legacy `scene` field into theme + mode.
+          ...normalizeThemeMode(d),
         }
         // Skip no-op snapshots. replaceAll hands every row a new object identity,
         // which re-runs every layout animation in the list for no visible reason.

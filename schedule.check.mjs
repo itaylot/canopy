@@ -10,6 +10,7 @@ import { buildSchedule, unscheduled, scheduled, overdue, dayLoad } from './src/s
 import { addDaysIso, examLabel } from './src/utils.ts'
 import { zoneAt, tapGuard } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
+import { isDark, normalizeThemeMode } from './src/store.ts'
 
 const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
@@ -309,4 +310,29 @@ assert.equal(
   'unrelated edit survives the undo',
 )
 
-console.log('schedule.check.mjs: all 30 checks passed ✓')
+/* ---------------------------------------------------------------------------
+ * Theme + mode resolution and legacy migration (the real store helpers)
+ * ------------------------------------------------------------------------- */
+
+// 31. isDark: 'auto' follows the device; light/dark force it either way.
+assert.equal(isDark('auto', true), true, 'auto + device dark = dark')
+assert.equal(isDark('auto', false), false, 'auto + device light = light')
+assert.equal(isDark('dark', false), true, 'forced dark ignores a light device')
+assert.equal(isDark('light', true), false, 'forced light ignores a dark device')
+
+// 32. Legacy `scene` migrates without data loss: everything old becomes the
+//     forest place, and only 'night' carries over as a forced-dark mode.
+assert.deepEqual(normalizeThemeMode({ scene: 'night' }), { theme: 'forest', mode: 'dark' })
+assert.deepEqual(normalizeThemeMode({ scene: 'forest' }), { theme: 'forest', mode: 'auto' })
+assert.deepEqual(normalizeThemeMode({ scene: 'auto' }), { theme: 'forest', mode: 'auto' })
+
+// 33. New docs pass through; unknown/absent values fall back safely.
+assert.deepEqual(normalizeThemeMode({ theme: 'sea', mode: 'dark' }), { theme: 'sea', mode: 'dark' })
+assert.deepEqual(normalizeThemeMode({}), { theme: 'forest', mode: 'auto' }, 'empty doc is safe')
+assert.deepEqual(
+  normalizeThemeMode({ theme: 'bogus', mode: 'bogus' }),
+  { theme: 'forest', mode: 'auto' },
+  'garbage falls back to defaults',
+)
+
+console.log('schedule.check.mjs: all 33 checks passed ✓')

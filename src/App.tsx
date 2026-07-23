@@ -14,6 +14,8 @@ import { useAuth, useCloudSync } from './cloud'
 import { registerSW, applyUpdate } from './registerSW'
 import { toast } from './toast'
 import { useNav, type TabKey } from './nav'
+import { useStore } from './store'
+import { useApplyTheme, useResolvedDark, THEME_META } from './theme'
 
 // `short` is the mobile dock label — five tabs leave little room on a phone.
 const TABS: { key: TabKey; label: string; short: string; Icon: typeof House; Screen: ComponentType }[] = [
@@ -27,6 +29,7 @@ const TABS: { key: TabKey; label: string; short: string; Icon: typeof House; Scr
 export default function App() {
   const { user, loading } = useAuth()
   useCloudSync(user)
+  useApplyTheme()
 
   useEffect(() => {
     registerSW(() =>
@@ -54,12 +57,19 @@ export default function App() {
 function MainApp({ user }: { user: FirebaseUser }) {
   const { tab, setTab } = useNav()
   const active = TABS.find((t) => t.key === tab)!
+  const theme = useStore((s) => s.theme)
+  const dark = useResolvedDark()
 
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg md:max-w-2xl lg:grid lg:max-w-7xl lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-6">
       {/* Desktop sidebar - first grid column, which in RTL is the right side */}
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:py-6">
-        <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-surface bg-[url('/sidebar-bg.png')] bg-cover bg-bottom shadow-card dark:bg-none">
+        {/* Banner art per theme, hidden in dark mode (the bright illustration
+            reads wrong on the deep chrome). */}
+        <div
+          className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-surface bg-cover bg-bottom shadow-card"
+          style={{ backgroundImage: dark ? 'none' : `url(${THEME_META[theme].sidebar})` }}
+        >
           <div className="flex items-center gap-2 px-5 pb-2 pt-6 text-lg font-bold tracking-wide text-ink">
             <CanopyMark size={30} /> CANOPY
           </div>

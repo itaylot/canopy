@@ -20,16 +20,47 @@ export type Exam = { id: string; courseId: string; title: string; date: string }
 export const COURSE_COLORS = ['#4C7B39', '#714F21', '#8A5D1F', '#CA9D59', '#88A431', '#2E4A68']
 export const COURSE_EMOJIS = ['📐', '🧠', '📖', '⚗️', '💻', '🎨', '🧬', '📊', '🗺️', '🎵']
 
-/** 'auto' follows the clock (night after 20:00); the rest are pinned by the user. */
-export type SceneKey = 'auto' | 'forest' | 'night'
+/** The place: drives the palette, the home-screen scene and the sidebar art. */
+export type ThemeKey = 'forest' | 'sea' | 'snow' | 'snowpark'
+/** Light/dark. 'auto' follows the device; the others force it. */
+export type ModeKey = 'auto' | 'light' | 'dark'
+
+export const THEME_KEYS: ThemeKey[] = ['forest', 'sea', 'snow', 'snowpark']
+const MODE_KEYS: ModeKey[] = ['auto', 'light', 'dark']
+
+/** Pure resolution of the light/dark choice; 'auto' defers to the device. */
+export const isDark = (mode: ModeKey, systemDark: boolean): boolean =>
+  mode === 'dark' || (mode === 'auto' && systemDark)
+
+/**
+ * Normalizes theme+mode out of a persisted doc, migrating the old single
+ * `scene` field: 'night' forced a dark look, 'forest'/'auto' followed the
+ * device. Legacy data has no place, so it becomes forest. Unknown values fall
+ * back safely rather than throwing.
+ */
+export function normalizeThemeMode(d: {
+  theme?: unknown
+  mode?: unknown
+  scene?: unknown
+}): { theme: ThemeKey; mode: ModeKey } {
+  const theme = THEME_KEYS.includes(d.theme as ThemeKey) ? (d.theme as ThemeKey) : 'forest'
+  const mode = MODE_KEYS.includes(d.mode as ModeKey)
+    ? (d.mode as ModeKey)
+    : d.scene === 'night'
+      ? 'dark'
+      : 'auto'
+  return { theme, mode }
+}
 
 type State = {
   courses: Course[]
   tasks: Task[]
   exams: Exam[]
   dailyCap: number
-  scene: SceneKey
-  setScene: (s: SceneKey) => void
+  theme: ThemeKey
+  mode: ModeKey
+  setTheme: (t: ThemeKey) => void
+  setMode: (m: ModeKey) => void
   addCourse: (c: Omit<Course, 'id'>) => void
   updateCourse: (id: string, patch: Partial<Course>) => void
   removeCourse: (id: string) => void
@@ -45,7 +76,7 @@ type State = {
   setDailyCap: (n: number) => void
   /** Puts deleted rows back — see captureCourse and the undo toasts. */
   restore: (payload: Restorable) => void
-  replaceAll: (s: Pick<State, 'courses' | 'tasks' | 'exams' | 'dailyCap' | 'scene'>) => void
+  replaceAll: (s: Pick<State, 'courses' | 'tasks' | 'exams' | 'dailyCap' | 'theme' | 'mode'>) => void
 }
 
 export type Restorable = { courses?: Course[]; tasks?: Task[]; exams?: Exam[] }
@@ -75,8 +106,10 @@ export const useStore = create<State>()((set) => ({
   tasks: [],
   exams: [],
   dailyCap: 180,
-  scene: 'auto',
-  setScene: (scene) => set({ scene }),
+  theme: 'forest',
+  mode: 'auto',
+  setTheme: (theme) => set({ theme }),
+  setMode: (mode) => set({ mode }),
   addCourse: (c) => set((s) => ({ courses: [...s.courses, { ...c, id: uid() }] })),
   updateCourse: (id, patch) =>
     set((s) => ({ courses: s.courses.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),

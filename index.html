@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#4c7b39" />
     <title>Canopy · לימודים למבחנים</title>
+
+    <!-- Paint the right theme on the first frame. The cloud doc is the source
+         of truth and loads after auth; until then use the last-known values
+         cached in localStorage so there is no flash of the default palette. -->
+    <script>
+      try {
+        var r = document.documentElement,
+          t = localStorage.getItem('canopy-theme'),
+          m = localStorage.getItem('canopy-mode') || 'auto'
+        if (t) r.dataset.theme = t
+        var dark = m === 'dark' || (m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
+        r.dataset.mode = dark ? 'dark' : 'light'
+      } catch (e) {}
+    </script>
     <meta name="description" content="המסלול שלך דרך תקופת המבחנים: משימות לפי קורס, שיבוץ אוטומטי ותכנון שבועי." />
 
     <!-- Installable web app -->

@@ -1,21 +1,30 @@
 import { useMemo } from 'react'
 import { motion } from 'motion/react'
 import { SignOut, CloudCheck, Sun, Moon, Sparkle, DownloadSimple } from '@phosphor-icons/react'
-import { useStore, type SceneKey } from '../store'
+import { useStore, type ThemeKey, type ModeKey } from '../store'
+import { THEME_META, THEME_KEYS } from '../theme'
 import { auth, logOut } from '../firebase'
 import { formatDuration, todayIso, DAILY_CAP_OPTIONS_MIN } from '../utils'
 import { buildSchedule } from '../schedule'
 import { buildIcs, downloadIcs } from '../ics'
 import { Card, Field, inputClass } from '../ui'
 
-const SCENE_CHOICES: { key: SceneKey; label: string; Icon: typeof Sun }[] = [
+const MODE_CHOICES: { key: ModeKey; label: string; Icon: typeof Sun }[] = [
   { key: 'auto', label: 'אוטומטי', Icon: Sparkle },
-  { key: 'forest', label: 'יום', Icon: Sun },
-  { key: 'night', label: 'לילה', Icon: Moon },
+  { key: 'light', label: 'בהיר', Icon: Sun },
+  { key: 'dark', label: 'כהה', Icon: Moon },
 ]
 
+// A dab of each theme's primary + accent, so the swatch previews the palette.
+const THEME_SWATCH: Record<ThemeKey, React.CSSProperties> = {
+  forest: { background: 'linear-gradient(135deg, #4c7b39 60%, #b88a3e 60%)' },
+  sea: { background: 'linear-gradient(135deg, #14746c 60%, #d97e46 60%)' },
+  snow: { background: 'linear-gradient(135deg, #2f6a99 60%, #cf7f3c 60%)' },
+  snowpark: { background: 'linear-gradient(135deg, #4a51c9 60%, #ec5c33 60%)' },
+}
+
 export default function Profile() {
-  const { tasks, courses, exams, dailyCap, setDailyCap, scene, setScene } = useStore()
+  const { tasks, courses, exams, dailyCap, setDailyCap, theme, setTheme, mode, setMode } = useStore()
   const user = auth.currentUser
 
   const exportCalendar = () => {
@@ -80,27 +89,47 @@ export default function Profile() {
       </Card>
 
       <Card className="p-4">
-        <h2 className="mb-3 font-bold text-ink">הנוף במסך הבית</h2>
-        <div className="grid grid-cols-3 gap-2">
-          {SCENE_CHOICES.map(({ key, label, Icon }) => {
-            const on = scene === key
+        <h2 className="mb-3 font-bold text-ink">ערכת נושא</h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {THEME_KEYS.map((key) => {
+            const on = theme === key
             return (
               <button
                 key={key}
-                onClick={() => setScene(key)}
+                onClick={() => setTheme(key)}
                 aria-pressed={on}
-                className={`flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                   on ? 'bg-primary-soft text-primary ring-1 ring-primary/40' : 'text-muted hover:bg-primary-soft/50'
                 }`}
               >
-                <Icon size={20} weight={on ? 'fill' : 'regular'} />
+                <span className="h-4 w-4 shrink-0 rounded-full ring-1 ring-black/10" style={THEME_SWATCH[key]} />
+                {THEME_META[key].label}
+              </button>
+            )
+          })}
+        </div>
+
+        <h2 className="mb-2 mt-4 font-bold text-ink">מצב תצוגה</h2>
+        <div className="grid grid-cols-3 gap-2">
+          {MODE_CHOICES.map(({ key, label, Icon }) => {
+            const on = mode === key
+            return (
+              <button
+                key={key}
+                onClick={() => setMode(key)}
+                aria-pressed={on}
+                className={`flex flex-col items-center gap-1.5 rounded-xl px-2 py-2.5 text-xs font-medium transition-colors ${
+                  on ? 'bg-primary-soft text-primary ring-1 ring-primary/40' : 'text-muted hover:bg-primary-soft/50'
+                }`}
+              >
+                <Icon size={19} weight={on ? 'fill' : 'regular'} />
                 {label}
               </button>
             )
           })}
         </div>
         <p className="mt-2.5 text-xs text-muted">
-          במצב אוטומטי הנוף עובר ללילה בין 20:00 ל-06:00.
+          במצב אוטומטי התצוגה עוקבת אחרי הגדרת המכשיר (בהיר/כהה).
         </p>
       </Card>
 

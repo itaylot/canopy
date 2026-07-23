@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Dark mode is chosen by the app (theme.ts stamps data-mode), not the device
+   directly — so the `dark:` utility must follow data-mode, or a manual toggle
+   wouldn't reach any dark: class. */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -16,13 +21,20 @@
   --shadow-card: var(--shadow);
 }
 
-/* Canopy palette v3 - the user's locked 10-color scheme:
-   Porcelain #FDFDF9 (surface) · Prussian Blue #042544 (ink) · Fern #4C7B39
-   (actions) · Lime Moss #B5B938 / #88A431 (foliage) · Olive Bark #714F21 ·
-   Olive Wood #815623 · Golden Earth #8A5D1F · Dark Goldenrod #B88A3E ·
-   Camel #CA9D59. Soft/line/bg values are light tints of these, nothing else.
-   The goldenrod --accent stays reserved for "where you are right now". */
-:root {
+/* ============================================================================
+   Themes. Each theme is a full palette in light and dark. The place is chosen
+   via data-theme; light/dark via data-mode — both stamped on <html> before the
+   first paint by the boot script in index.html and kept in sync by theme.ts.
+   Every block redefines the whole token set, so a theme+mode combination never
+   inherits a stray value from a sibling block.
+   --shadow / color-scheme come from the mode, so they sit in the mode blocks.
+   ============================================================================ */
+
+/* ---- forest (default) · light --------------------------------------------
+   The user's locked v3 scheme: Porcelain surface, Prussian ink, Fern actions,
+   Lime Moss foliage, goldenrod reserved for "where you are right now". */
+:root,
+:root[data-theme='forest'] {
   --bg: #f7f6ec;
   --surface: #fdfdf9;
   --ink: #042544;
@@ -34,28 +46,124 @@
   --accent: #b88a3e;
   --accent-soft: #f4e8cf;
   --line: #e8e6d6;
+}
+
+/* ---- sea · light --------------------------------------------------------- */
+:root[data-theme='sea'] {
+  --bg: #eef4f2;
+  --surface: #fbfdfc;
+  --ink: #06283a;
+  --muted: #5f7d80;
+  --primary: #14746c;
+  --primary-soft: #d7ebe7;
+  --tree-2: #2f9e93;
+  --bark: #b5794a;
+  --accent: #d97e46;
+  --accent-soft: #f7e6d8;
+  --line: #dbe9e5;
+}
+
+/* ---- snow / ski · light -------------------------------------------------- */
+:root[data-theme='snow'] {
+  --bg: #e9eef3;
+  --surface: #f7fafc;
+  --ink: #12283a;
+  --muted: #647889;
+  --primary: #2f6a99;
+  --primary-soft: #dbe8f3;
+  --tree-2: #5b8f6a;
+  --bark: #b07d4a;
+  --accent: #cf7f3c;
+  --accent-soft: #f4e5d2;
+  --line: #d5e0ea;
+}
+
+/* ---- snowpark / snowboard · light ---------------------------------------- */
+:root[data-theme='snowpark'] {
+  --bg: #eceef4;
+  --surface: #fbfcfe;
+  --ink: #1a2036;
+  --muted: #6a7086;
+  --primary: #4a51c9;
+  --primary-soft: #e2e3fb;
+  --tree-2: #5b8f6a;
+  --bark: #b07d4a;
+  --accent: #ec5c33;
+  --accent-soft: #fbe0d6;
+  --line: #dcdfec;
+}
+
+/* light-mode chrome, shared by every theme */
+:root {
   --shadow: 0 1px 2px rgb(4 37 68 / 0.04), 0 8px 24px rgb(4 37 68 / 0.06);
   color-scheme: light;
 }
 
-/* Dark mode lives on Prussian Blue depths; Lime Moss carries the actions,
-   Camel carries the warmth. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #061829;
-    --surface: #0c2338;
-    --ink: #f1f3ea;
-    --muted: #8fa0ac;
-    --primary: #88a431;
-    --primary-soft: #1c3524;
-    --tree-2: #4c7b39;
-    --bark: #ca9d59;
-    --accent: #ca9d59;
-    --accent-soft: #3b2f16;
-    --line: #1d3550;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 8px 24px rgb(0 0 0 / 0.35);
-    color-scheme: dark;
-  }
+/* ---- forest · dark ------------------------------------------------------- */
+:root[data-mode='dark'],
+:root[data-theme='forest'][data-mode='dark'] {
+  --bg: #061829;
+  --surface: #0c2338;
+  --ink: #f1f3ea;
+  --muted: #8fa0ac;
+  --primary: #88a431;
+  --primary-soft: #1c3524;
+  --tree-2: #4c7b39;
+  --bark: #ca9d59;
+  --accent: #ca9d59;
+  --accent-soft: #3b2f16;
+  --line: #1d3550;
+}
+
+/* ---- sea · dark ---------------------------------------------------------- */
+:root[data-theme='sea'][data-mode='dark'] {
+  --bg: #04222e;
+  --surface: #0a2f3d;
+  --ink: #e6f1ef;
+  --muted: #7fa0a2;
+  --primary: #4fb3a6;
+  --primary-soft: #0f3b3a;
+  --tree-2: #6fc9bd;
+  --bark: #d0a06a;
+  --accent: #e0995e;
+  --accent-soft: #37291a;
+  --line: #16414f;
+}
+
+/* ---- snow · dark --------------------------------------------------------- */
+:root[data-theme='snow'][data-mode='dark'] {
+  --bg: #0b1a26;
+  --surface: #12293a;
+  --ink: #eaf1f6;
+  --muted: #8199a8;
+  --primary: #6ba6d6;
+  --primary-soft: #123047;
+  --tree-2: #79ad86;
+  --bark: #cf9a5f;
+  --accent: #dc9a5a;
+  --accent-soft: #322616;
+  --line: #1b3448;
+}
+
+/* ---- snowpark · dark ----------------------------------------------------- */
+:root[data-theme='snowpark'][data-mode='dark'] {
+  --bg: #0f1226;
+  --surface: #1a1e3a;
+  --ink: #e9eaf6;
+  --muted: #9096b4;
+  --primary: #7d82ee;
+  --primary-soft: #23264a;
+  --tree-2: #79ad86;
+  --bark: #cf9a5f;
+  --accent: #ff7a54;
+  --accent-soft: #34211a;
+  --line: #262a4e;
+}
+
+/* dark-mode chrome, shared by every theme */
+:root[data-mode='dark'] {
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 8px 24px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
 }
 
 html, body, #root { height: 100%; }

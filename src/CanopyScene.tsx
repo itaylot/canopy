@@ -1,56 +1,85 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { useStore, type SceneKey } from './store'
+import { useStore, type ThemeKey } from './store'
+import { useResolvedDark } from './theme'
 
-// Illustration coordinate space (matches scene-bg-min.png at 1400x700).
+// Illustration coordinate space — every background is normalized to 1400×700.
 const W = 1400
 const H = 700
 const MAX_NODES = 7
 
 /**
- * Backgrounds are data, not code. Each scene carries its own rope anchors,
- * because the overlay is drawn in the illustration's coordinate space — art
- * with a different composition needs its own a/b/c or the rope misses the
- * trees. Adding a background = drop a PNG in /public, add a row here.
+ * A scene is an illustrated background with a live overlay (checkpoints + a
+ * traveller) drawn in the illustration's coordinate space. Each theme has one.
+ *
+ * The traveller moves along a Bézier curve set by three anchors (a → c → b).
+ * In the forest that curve is a rope the app draws and the rider hangs beneath
+ * it; in the other scenes the curve follows a line already painted into the art
+ * (a wave, a piste) so the app draws no line and the character sits on top.
  */
 type Scene = {
-  label: string
   src: string
-  /** Rope anchors: the two tree platforms + the sag control point between them. */
+  character: string
   a: { x: number; y: number }
   b: { x: number; y: number }
   c: { x: number; y: number }
-  rope: string
-  /** Applied to the background image only, never to the overlay. */
-  filter?: string
-  dark?: boolean
+  /** Rope colour, or null when the path is part of the art (no line drawn). */
+  rope: string | null
+  /** Traveller width as % of scene width. */
+  riderW: number
+  /** Vertical nudge of the traveller in %: forest hangs (~-1.5), the others
+   *  sit on the line (more negative — the sprite sits above its contact point). */
+  riderDy: number
+  /** Filter applied to the background image in dark mode. */
+  darkFilter: string
+  /** Star field in dark mode (forest night keeps its stars). */
+  stars?: boolean
 }
 
-// Calibrated against scene-bg-min.png. If that art changes, re-tune these three.
-const FOREST_ANCHORS = {
-  a: { x: 133, y: 430 },
-  b: { x: 1313, y: 494 },
-  c: { x: 700, y: 560 },
-}
+const NIGHT = 'saturate(0.5) brightness(0.55) hue-rotate(185deg) contrast(1.08)'
+const DUSK = 'saturate(0.8) brightness(0.62)'
 
-export const SCENES: Record<'forest' | 'night', Scene> = {
-  forest: { label: 'יער · יום', src: '/scene-bg-min.png', ...FOREST_ANCHORS, rope: '#a07b3f' },
-  // Night reuses the daytime art through a filter instead of a second asset:
-  // same composition, so the anchors carry over untouched and there's nothing
-  // extra to download. A dedicated night illustration can replace `src` later.
-  night: {
-    label: 'יער · לילה',
+export const SCENES: Record<ThemeKey, Scene> = {
+  forest: {
     src: '/scene-bg-min.png',
-    ...FOREST_ANCHORS,
-    rope: '#d8b981',
-    filter: 'saturate(0.5) brightness(0.55) hue-rotate(185deg) contrast(1.08)',
-    dark: true,
+    character: '/rider-clean.png',
+    a: { x: 133, y: 430 }, c: { x: 700, y: 560 }, b: { x: 1313, y: 494 },
+    rope: '#a07b3f',
+    riderW: 8.5,
+    riderDy: -1.5,
+    darkFilter: NIGHT,
+    stars: true,
+  },
+  // Anchors below trace the line painted into each illustration; tuned against
+  // the real art in the browser.
+  sea: {
+    src: '/scene-sea.png',
+    character: '/rider-surf.png',
+    a: { x: 150, y: 430 }, c: { x: 700, y: 420 }, b: { x: 1300, y: 470 },
+    rope: null,
+    riderW: 9,
+    riderDy: -15,
+    darkFilter: DUSK,
+  },
+  snow: {
+    src: '/scene-snow.png',
+    character: '/rider-ski.png',
+    a: { x: 150, y: 380 }, c: { x: 720, y: 470 }, b: { x: 1300, y: 520 },
+    rope: null,
+    riderW: 9,
+    riderDy: -15,
+    darkFilter: DUSK,
+  },
+  snowpark: {
+    src: '/scene-snowpark.png',
+    character: '/rider-snowboard.png',
+    a: { x: 150, y: 360 }, c: { x: 700, y: 470 }, b: { x: 1300, y: 540 },
+    rope: null,
+    riderW: 9,
+    riderDy: -15,
+    darkFilter: DUSK,
   },
 }
-
-/** 'auto' follows the clock; anything else is the user's explicit pick. */
-export const resolveScene = (pref: SceneKey, hour: number): Scene =>
-  pref === 'forest' || pref === 'night' ? SCENES[pref] : hour >= 20 || hour < 6 ? SCENES.night : SCENES.forest
 
 /** Short hop between neighbouring checkpoints, slow victory glide when the
  *  day's route is finished — the completion moment should be watchable. */
@@ -89,14 +118,15 @@ function Stars() {
 }
 
 /**
- * The progress metaphor, mockup-grade: an illustrated forest background
- * (generated art) with a live SVG overlay for the parts that change - the
- * rope checkpoints and the rider, who hangs at the first unfinished task.
+ * The progress metaphor: an illustrated background with a live overlay for the
+ * parts that change — the checkpoints and the traveller, who waits at the first
+ * unfinished task and glides forward as tasks are completed.
  */
 export function CanopyScene({ done, remaining }: { done: number; remaining: number }) {
   const reduce = useReducedMotion()
-  const pref = useStore((s) => s.scene)
-  const scene = resolveScene(pref, new Date().getHours())
+  const theme = useStore((s) => s.theme)
+  const dark = useResolvedDark()
+  const scene = SCENES[theme]
   const ropePoint = useMemo(() => makeRopePoint(scene), [scene])
   const total = Math.min(done + remaining, MAX_NODES)
   const doneShown = total === 0 ? 0 : Math.min(done, total)
@@ -109,19 +139,14 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
     state: i < doneShown ? 'done' : i === doneShown ? 'current' : 'todo',
   }))
 
-  // Where the rider hangs, as a position along the rope (0 = near tree, 1 = far).
+  // Where the traveller sits, as a position along the curve (0 = near, 1 = far).
   const riderT =
-    total === 0
-      ? 0.5
-      : doneShown >= total
-        ? 0.92 // route finished: rider glides off toward the far tree
-        : nodeT(doneShown)
+    total === 0 ? 0.5 : doneShown >= total ? 0.92 : nodeT(doneShown)
 
-  // The rider PNG is trimmed so the pulley wheel sits at its very top center.
-  const riderW = 8.5 // % of scene width
+  const riderW = scene.riderW
 
   // Travel along the *curve* rather than straight between checkpoints: sample
-  // the rope between the last position and the new one and hand the samples to
+  // the curve between the last position and the new one and hand the samples to
   // Motion as keyframes. Finishing the day is a longer, more deliberate glide.
   const prevT = useRef(riderT)
   const from = prevT.current
@@ -136,10 +161,10 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
     const pts = Array.from({ length: steps + 1 }, (_, i) => ropePoint(from + ((riderT - from) * i) / steps))
     return {
       left: pts.map((p) => (p.x / W) * 100 - riderW / 2),
-      top: pts.map((p) => (p.y / H) * 100 - 1.5),
+      top: pts.map((p) => (p.y / H) * 100 + scene.riderDy),
     }
     // `from` is a ref read: intentionally not a dependency, riderT drives it.
-  }, [riderT, distance, from, ropePoint])
+  }, [riderT, distance, from, ropePoint, riderW, scene.riderDy])
 
   return (
     <div className="relative w-full overflow-hidden" role="img" aria-label="מסלול ההתקדמות">
@@ -147,18 +172,20 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
         src={scene.src}
         alt=""
         className="block w-full transition-[filter] duration-700"
-        style={{ filter: scene.filter }}
+        style={{ filter: dark ? scene.darkFilter : undefined }}
       />
-      {scene.dark && <Stars />}
+      {dark && scene.stars && <Stars />}
 
       <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full">
-        <path
-          d={`M ${scene.a.x} ${scene.a.y} Q ${scene.c.x} ${scene.c.y} ${scene.b.x} ${scene.b.y}`}
-          stroke={scene.rope}
-          strokeWidth="7"
-          fill="none"
-          strokeLinecap="round"
-        />
+        {scene.rope && (
+          <path
+            d={`M ${scene.a.x} ${scene.a.y} Q ${scene.c.x} ${scene.c.y} ${scene.b.x} ${scene.b.y}`}
+            stroke={scene.rope}
+            strokeWidth="7"
+            fill="none"
+            strokeLinecap="round"
+          />
+        )}
         {nodes.map((n, i) => (
           <motion.g
             key={i}
@@ -173,8 +200,8 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
                 cx={n.x}
                 cy={n.y}
                 r={n.state === 'done' ? 34 : 30}
-                fill={n.state === 'done' ? '#4c7b39' : '#fdfdf9'}
-                stroke={n.state === 'done' ? 'none' : '#d9d5c0'}
+                fill={n.state === 'done' ? 'var(--primary)' : 'var(--surface)'}
+                stroke={n.state === 'done' ? 'none' : 'var(--line)'}
                 strokeWidth="3"
                 strokeDasharray={n.state === 'todo' ? '8 8' : undefined}
               />
@@ -182,7 +209,7 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
             {n.state === 'done' && (
               <path
                 d={`M ${n.x - 14} ${n.y} L ${n.x - 3} ${n.y + 11} L ${n.x + 15} ${n.y - 13}`}
-                stroke="#fff"
+                stroke="var(--surface)"
                 strokeWidth="7"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -195,7 +222,7 @@ export function CanopyScene({ done, remaining }: { done: number; remaining: numb
 
       {total > 0 && (
         <motion.img
-          src="/rider-clean.png"
+          src={scene.character}
           alt=""
           className="absolute"
           style={{ width: `${riderW}%` }}
