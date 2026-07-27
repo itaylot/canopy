@@ -15,6 +15,7 @@ import { useStore } from '../store'
 import { useResolvedDark } from '../theme'
 import { useFocus, msLeft, isPaused, isDone, FOCUS_SCENES } from '../focus'
 import { startAmbient, stopAmbient } from '../ambient'
+import { FocusAmbience } from './FocusAmbience'
 
 const now = () => Date.now()
 const fmt = (ms: number) => {
@@ -96,6 +97,10 @@ export default function Focus() {
         animate={reduce ? {} : { scale: 1.08 }}
         transition={{ duration: session.totalMs / 1000, ease: 'linear' }}
       />
+      {/* A whisper of movement over the still art — sits above the image but
+          below the scrims, so it never competes with the timer for attention. */}
+      <FocusAmbience theme={theme} />
+
       {/* Legibility scrims: a soft one at the bottom for the timer, and a fade
           from the top for the controls — the art alone can't guarantee contrast. */}
       <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 to-transparent" />
