@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   Pause,
   Play,
+  Stop,
   CaretDown,
   SpeakerHigh,
   SpeakerSlash,
@@ -32,6 +33,8 @@ export default function Focus() {
   const open = useFocus((s) => s.open)
   const soundOn = useFocus((s) => s.soundOn)
   const { pause, resume, extend, stop, collapse, setSound } = useFocus()
+  const dragOffset = useFocus((s) => s.dragOffset)
+  const setDragOffset = useFocus((s) => s.setDragOffset)
   const theme = useStore((s) => s.theme)
   const dark = useResolvedDark()
   const reduce = useReducedMotion()
@@ -112,16 +115,16 @@ export default function Focus() {
             <button
               onClick={collapse}
               aria-label="מזעור"
-              className="flex items-center gap-1.5 rounded-full bg-black/30 px-3 py-2 text-sm text-white backdrop-blur-md transition-colors hover:bg-black/50"
+              className="flex items-center gap-2 rounded-full bg-black/30 px-4 py-2.5 text-base text-white backdrop-blur-md transition-colors hover:bg-black/50"
             >
-              <CaretDown size={18} /> מזעור
+              <CaretDown size={22} /> מזעור
             </button>
             <button
               onClick={() => setSound(!soundOn)}
               aria-label={soundOn ? 'כבה צליל' : 'הפעל צליל'}
-              className="grid h-10 w-10 place-items-center rounded-full bg-black/30 text-white backdrop-blur-md transition-colors hover:bg-black/50"
+              className="grid h-12 w-12 place-items-center rounded-full bg-black/30 text-white backdrop-blur-md transition-colors hover:bg-black/50"
             >
-              {soundOn ? <SpeakerHigh size={20} /> : <SpeakerSlash size={20} />}
+              {soundOn ? <SpeakerHigh size={24} /> : <SpeakerSlash size={24} />}
             </button>
           </motion.div>
         )}
@@ -136,6 +139,13 @@ export default function Focus() {
           dragConstraints={containerRef}
           dragMomentum={false}
           dragElastic={0.05}
+          // Controlled by dragOffset (in the focus store, not component state) so
+          // the position survives minimizing and re-expanding within the session
+          // — the component unmounts on collapse, and this comes back from outside it.
+          style={{ x: dragOffset.x, y: dragOffset.y }}
+          onDragEnd={(_, info) =>
+            setDragOffset({ x: dragOffset.x + info.offset.x, y: dragOffset.y + info.offset.y })
+          }
           className={`absolute p-5 text-right text-white sm:p-8 ${
             scene.anchor.y === 'bottom' ? 'bottom-0' : 'top-14'
           } ${scene.anchor.x === 'right' ? 'right-0' : 'left-0'}`}
@@ -146,29 +156,43 @@ export default function Focus() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="mb-1 flex cursor-grab items-center gap-1 text-[11px] text-white/50 active:cursor-grabbing"
+                className="mb-1.5 flex cursor-grab items-center gap-1.5 text-sm text-white/50 active:cursor-grabbing"
               >
-                <DotsSix size={14} /> גרור
+                <DotsSix size={18} /> גרור
               </motion.div>
             )}
           </AnimatePresence>
           {session.taskTitle && (
-            <p className="mb-1 max-w-[70vw] truncate text-sm text-white/80">{session.taskTitle}</p>
+            <p className="mb-1.5 max-w-[70vw] truncate text-base text-white/80">{session.taskTitle}</p>
           )}
-          <div className="flex items-center gap-3">
-            <span className="text-4xl font-bold tabular-nums tracking-tight sm:text-5xl">{fmt(left)}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-5xl font-bold tabular-nums tracking-tight sm:text-6xl">{fmt(left)}</span>
             <AnimatePresence>
               {chromeShown && (
-                <motion.button
+                <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  onClick={() => (paused ? resume(now()) : pause(now()))}
-                  aria-label={paused ? 'המשך' : 'השהה'}
-                  className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-black shadow-lg transition-transform hover:scale-105"
+                  className="flex items-center gap-2"
                 >
-                  {paused ? <Play weight="fill" size={22} /> : <Pause weight="fill" size={22} />}
-                </motion.button>
+                  {/* Pause/resume and Stop are separate controls: one button doing
+                      double duty here made a tap on "pause" from the minimized bar
+                      (which only opens the overlay) look like it silently failed. */}
+                  <button
+                    onClick={() => (paused ? resume(now()) : pause(now()))}
+                    aria-label={paused ? 'המשך' : 'השהה'}
+                    className="grid h-14 w-14 place-items-center rounded-full bg-white/90 text-black shadow-lg transition-transform hover:scale-105"
+                  >
+                    {paused ? <Play weight="fill" size={26} /> : <Pause weight="fill" size={26} />}
+                  </button>
+                  <button
+                    onClick={stop}
+                    aria-label="סיום מיקוד"
+                    className="grid h-14 w-14 place-items-center rounded-full bg-black/30 text-white backdrop-blur-md transition-colors hover:bg-black/50"
+                  >
+                    <Stop weight="fill" size={22} />
+                  </button>
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
@@ -176,19 +200,7 @@ export default function Focus() {
           <div className="mt-3 h-0.5 w-40 overflow-hidden rounded-full bg-white/25 sm:w-56">
             <div className="h-full rounded-full bg-white/80" style={{ width: `${Math.min(100, progress * 100)}%` }} />
           </div>
-          <AnimatePresence>
-            {chromeShown && (
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={stop}
-                className="mt-2 text-xs text-white/70 transition-colors hover:text-white"
-              >
-                {paused ? 'מושהה · ' : ''}סיום מיקוד
-              </motion.button>
-            )}
-          </AnimatePresence>
+          {paused && <p className="mt-2 text-sm text-white/70">מושהה</p>}
         </motion.div>
       )}
 
@@ -207,7 +219,7 @@ export default function Focus() {
 export function FocusBar() {
   const session = useFocus((s) => s.session)
   const open = useFocus((s) => s.open)
-  const expand = useFocus((s) => s.expand)
+  const { expand, pause, resume } = useFocus()
   const [, tick] = useState(0)
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 1000)
@@ -219,19 +231,29 @@ export function FocusBar() {
   const paused = isPaused(session)
 
   return (
-    <motion.button
+    <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 12 }}
-      onClick={expand}
       className="fixed inset-x-0 bottom-0 z-50 mx-auto mb-[max(5.5rem,calc(env(safe-area-inset-bottom)+5rem))] flex max-w-xs items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-on-primary shadow-lg lg:mb-6"
     >
-      {paused ? <Play weight="fill" size={18} /> : <Pause weight="fill" size={18} />}
-      <span className="min-w-0 flex-1 truncate text-right text-sm font-medium">
-        {session.taskTitle ?? 'מיקוד'}
-      </span>
-      <span className="shrink-0 text-lg font-bold tabular-nums">{fmt(left)}</span>
-    </motion.button>
+      {/* Pause here really pauses — it used to only look like a pause button and
+          actually re-opened the overlay no matter where on the pill you tapped. */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          paused ? resume(now()) : pause(now())
+        }}
+        aria-label={paused ? 'המשך' : 'השהה'}
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/10 transition-colors hover:bg-black/20"
+      >
+        {paused ? <Play weight="fill" size={17} /> : <Pause weight="fill" size={17} />}
+      </button>
+      <button onClick={expand} className="flex min-w-0 flex-1 items-center gap-3 text-right">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{session.taskTitle ?? 'מיקוד'}</span>
+        <span className="shrink-0 text-lg font-bold tabular-nums">{fmt(left)}</span>
+      </button>
+    </motion.div>
   )
 }
 

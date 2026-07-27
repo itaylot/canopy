@@ -80,15 +80,23 @@ type FocusState = {
   expand: () => void
   stop: () => void
   setSound: (on: boolean) => void
+  /** Where the user dragged the timer to, as a pixel offset from its scene
+   *  anchor. Lives here (not component state) so it survives collapsing and
+   *  re-expanding the overlay within the same session; a new session resets it. */
+  dragOffset: { x: number; y: number }
+  setDragOffset: (pos: { x: number; y: number }) => void
 }
 
 export const useFocus = create<FocusState>()((set) => ({
   session: null,
   open: false,
   soundOn: readSound(),
+  dragOffset: { x: 0, y: 0 },
+  setDragOffset: (dragOffset) => set({ dragOffset }),
   start: ({ taskId, taskTitle, minutes }, now) =>
     set({
       open: true,
+      dragOffset: { x: 0, y: 0 },
       session: {
         taskId: taskId ?? null,
         taskTitle: taskTitle ?? null,
@@ -125,7 +133,7 @@ export const useFocus = create<FocusState>()((set) => ({
     }),
   collapse: () => set({ open: false }),
   expand: () => set({ open: true }),
-  stop: () => set({ session: null, open: false }),
+  stop: () => set({ session: null, open: false, dragOffset: { x: 0, y: 0 } }),
   setSound: (on) => {
     try {
       localStorage.setItem(SOUND_KEY, on ? 'on' : 'off')
