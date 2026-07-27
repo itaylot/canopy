@@ -12,6 +12,7 @@ import { addDaysIso, examLabel } from './src/utils.ts'
 import { zoneAt, tapGuard } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
 import { isDark, normalizeThemeMode, themedCourseColor, COURSE_PALETTES } from './src/store.ts'
+import { msLeft, isPaused, isDone } from './src/focus.ts'
 
 const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
@@ -410,4 +411,33 @@ for (const [name, list] of Object.entries(COURSE_PALETTES)) {
   assert.equal(new Set(list.map((c) => c.toLowerCase())).size, list.length, `${name} has no duplicates`)
 }
 
-console.log('schedule.check.mjs: all 37 checks passed ✓')
+/* ---------------------------------------------------------------------------
+ * Focus session clock (src/focus.ts)
+ *
+ * The whole point is a timer that survives leaving the screen, so the remaining
+ * time is derived from an absolute end timestamp, not a counter. These pin that.
+ * ------------------------------------------------------------------------- */
+const T0 = 1_000_000
+const running = (endsAt) => ({ taskId: null, taskTitle: null, totalMs: 25 * 60_000, endsAt, pausedLeftMs: null })
+const paused = (leftMs) => ({ taskId: null, taskTitle: null, totalMs: 25 * 60_000, endsAt: null, pausedLeftMs: leftMs })
+
+// 38. Time left is measured from the end timestamp, so re-reading it later (a
+//     reload, a backgrounded tab) gives the correct smaller number, not a reset.
+const sess = running(T0 + 25 * 60_000)
+assert.equal(msLeft(sess, T0), 25 * 60_000, 'full at the start')
+assert.equal(msLeft(sess, T0 + 10 * 60_000), 15 * 60_000, '10 minutes later, 15 remain')
+assert.equal(msLeft(sess, T0 + 99 * 60_000), 0, 'never goes negative')
+
+// 39. A paused session freezes: time left is fixed regardless of the clock.
+const p = paused(12 * 60_000)
+assert.equal(msLeft(p, T0), 12 * 60_000)
+assert.equal(msLeft(p, T0 + 5 * 60_000), 12 * 60_000, 'paused time does not drain')
+assert.ok(isPaused(p) && !isPaused(sess))
+
+// 40. Done is a function of the clock, so completion is detected on the next
+//     read even if nothing fired exactly at zero.
+assert.ok(!isDone(sess, T0))
+assert.ok(isDone(running(T0), T0 + 1), 'past the end time = done')
+assert.ok(!isDone(paused(5), T0 + 10_000), 'a paused session is never done')
+
+console.log('schedule.check.mjs: all 40 checks passed ✓')

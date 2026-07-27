@@ -1,10 +1,8 @@
-import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react'
+import { useMemo, useState, useEffect, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   Timer,
   Play,
-  Pause,
-  ArrowCounterClockwise,
   ArrowDown,
   ArrowUUpLeft,
   CheckCircle,
@@ -28,12 +26,14 @@ import {
   formatHeShort,
 } from '../utils'
 import { TaskRow, LeafBurst, Card } from '../ui'
+import { useFocus, FOCUS_MINUTES, DEFAULT_FOCUS_MINUTES } from '../focus'
 import { CanopyScene } from '../CanopyScene'
 import { auth } from '../firebase'
 import { goTo } from '../nav'
 
 export default function Home() {
   const { tasks, exams, courses, toggleTask } = useStore()
+  const startFocus = useFocus((s) => s.start)
   const today = todayIso()
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
 
@@ -118,7 +118,14 @@ export default function Home() {
             <div className="divide-y divide-line/70">
               <AnimatePresence mode="popLayout">
                 {pendingToday.map((t) => (
-                  <TaskRow key={t.id} flat task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
+                  <TaskRow
+                    key={t.id}
+                    flat
+                    task={t}
+                    course={courseById.get(t.courseId)}
+                    onToggle={() => toggleTask(t.id)}
+                    onFocus={() => startFocus({ taskId: t.id, taskTitle: t.title, minutes: DEFAULT_FOCUS_MINUTES }, Date.now())}
+                  />
                 ))}
               </AnimatePresence>
 
@@ -430,39 +437,15 @@ function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; t
   )
 }
 
-const FOCUS_MINUTES = 25
-
-/** A plain countdown for a focus session. Session-scoped on purpose: nothing
- *  is written to the cloud, so a half-finished timer can't pollute the data. */
+/**
+ * Launcher for the immersive focus mode. Pick a length and enter — the running
+ * session lives in the focus store (timestamp-based), so this card holds no
+ * timer state itself. Replaces the old inline countdown, which couldn't survive
+ * leaving the screen.
+ */
 function FocusTimer({ className = '' }: { className?: string }) {
-  const [left, setLeft] = useState(FOCUS_MINUTES * 60)
-  const [running, setRunning] = useState(false)
-  const [donePings, setDonePings] = useState(0)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
-
-  useEffect(() => {
-    if (!running) return
-    intervalRef.current = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1) {
-          setRunning(false)
-          setDonePings((n) => n + 1)
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-    return () => clearInterval(intervalRef.current)
-  }, [running])
-
-  const mm = String(Math.floor(left / 60)).padStart(2, '0')
-  const ss = String(left % 60).padStart(2, '0')
-  const pct = 1 - left / (FOCUS_MINUTES * 60)
-
-  const reset = () => {
-    setRunning(false)
-    setLeft(FOCUS_MINUTES * 60)
-  }
+  const start = useFocus((s) => s.start)
+  const [minutes, setMinutes] = useState(DEFAULT_FOCUS_MINUTES)
 
   return (
     <Card className={`flex flex-col p-4 ${className}`}>
@@ -470,50 +453,30 @@ function FocusTimer({ className = '' }: { className?: string }) {
         <Timer size={18} className="text-primary" /> זמן מיקוד
       </h2>
 
-      <div className="flex flex-1 items-center justify-center gap-5">
-        <div className="relative grid h-20 w-20 shrink-0 place-items-center">
-          <svg viewBox="0 0 40 40" className="absolute inset-0 -rotate-90">
-            <circle cx="20" cy="20" r="17" fill="none" stroke="var(--line)" strokeWidth="4" />
-            <circle
-              cx="20"
-              cy="20"
-              r="17"
-              fill="none"
-              stroke="var(--primary)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={2 * Math.PI * 17}
-              strokeDashoffset={2 * Math.PI * 17 * (1 - pct)}
-            />
-          </svg>
-          <span className="text-lg font-bold tabular-nums text-ink">
-            {mm}:{ss}
-          </span>
+      <div className="flex flex-1 flex-col justify-center gap-3">
+        <div className="flex flex-wrap gap-1.5">
+          {FOCUS_MINUTES.map((m) => (
+            <button
+              key={m}
+              onClick={() => setMinutes(m)}
+              className={`rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition-colors ${
+                m === minutes ? 'bg-primary text-on-primary' : 'bg-primary-soft text-primary hover:bg-primary/15'
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+          <span className="self-center text-xs text-muted">דקות</span>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={() => setRunning((r) => !r)}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
-          >
-            {running ? <Pause weight="fill" size={16} /> : <Play weight="fill" size={16} />}
-            {running ? 'עצור' : left === FOCUS_MINUTES * 60 ? 'התחל' : 'המשך'}
-          </motion.button>
-          <button
-            onClick={reset}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-line px-4 py-2 text-sm text-muted transition-colors hover:text-ink"
-          >
-            <ArrowCounterClockwise size={15} /> אפס
-          </button>
-        </div>
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={() => start({ minutes }, Date.now())}
+          className="flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-on-primary"
+        >
+          <Play weight="fill" size={16} /> כניסה למצב מיקוד
+        </motion.button>
       </div>
-
-      {donePings > 0 && (
-        <p className="mt-3 text-xs text-muted">
-          {donePings === 1 ? 'סשן מיקוד אחד הושלם היום.' : `${donePings} סשני מיקוד הושלמו היום.`}
-        </p>
-      )}
     </Card>
   )
 }

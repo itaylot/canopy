@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useState, type ReactNode } from 'react'
-import { DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
+import { DotsThree, PencilSimple, Trash, Timer } from '@phosphor-icons/react'
 import type { Course, Task } from './store'
 import { useToasts, type Toast as ToastType } from './toast'
 import { useCourseColor } from './theme'
@@ -162,6 +162,7 @@ export function TaskRow({
   onToggle,
   onEdit,
   onDelete,
+  onFocus,
   menu,
   note,
   flat = false,
@@ -171,6 +172,8 @@ export function TaskRow({
   onToggle: () => void
   onEdit?: () => void
   onDelete?: () => void
+  /** Starts an immersive focus session for this task. */
+  onFocus?: () => void
   /** Replaces the default edit/delete menu — used by the overdue list, whose
    *  actions are about rescheduling rather than editing. */
   menu?: MenuItem[]
@@ -210,6 +213,17 @@ export function TaskRow({
         </div>
         {note && <div className="mt-0.5 truncate text-[11px] text-accent">{note}</div>}
       </button>
+
+      {onFocus && !task.done && (
+        <button
+          onClick={onFocus}
+          aria-label="מצב מיקוד"
+          title="מצב מיקוד"
+          className="shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-primary-soft hover:text-primary"
+        >
+          <Timer size={18} />
+        </button>
+      )}
 
       {menu ? (
         <RowMenu items={menu} />

@@ -1,5 +1,5 @@
 import { useEffect, type ComponentType } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { House, CalendarBlank, BookOpen, User, Kanban } from '@phosphor-icons/react'
 import type { User as FirebaseUser } from 'firebase/auth'
 import Home from './screens/Home'
@@ -8,6 +8,7 @@ import CalendarScreen from './screens/CalendarScreen'
 import Courses from './screens/Courses'
 import Profile from './screens/Profile'
 import Login from './screens/Login'
+import Focus, { FocusBar } from './screens/Focus'
 import { CanopyMark, Toaster } from './ui'
 import { isConfigured } from './firebaseConfig'
 import { useAuth, useCloudSync } from './cloud'
@@ -50,6 +51,15 @@ export default function App() {
       )}
       {/* Outside the auth branches: a sync failure has to be visible on every screen. */}
       <Toaster />
+      {/* Focus overlay + its resume bar sit above everything, including the nav. */}
+      {user && (
+        <>
+          <FocusBar />
+          <AnimatePresence>
+            <Focus />
+          </AnimatePresence>
+        </>
+      )}
     </>
   )
 }
