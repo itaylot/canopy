@@ -23,6 +23,7 @@ const dataOf = (s: ReturnType<typeof useStore.getState>) => ({
   courses: s.courses,
   tasks: s.tasks,
   exams: s.exams,
+  quickTasks: s.quickTasks,
   dailyCap: s.dailyCap,
   theme: s.theme,
   mode: s.mode,
@@ -80,6 +81,7 @@ export function useCloudSync(user: User | null) {
           courses: d.courses ?? [],
           tasks: d.tasks ?? [],
           exams: d.exams ?? [],
+          quickTasks: d.quickTasks ?? [],
           dailyCap: d.dailyCap ?? 180,
           // Splits/migrates the legacy `scene` field into theme + mode.
           ...normalizeThemeMode(d),

@@ -76,6 +76,15 @@ export default function Focus() {
   const done = isDone(session, now())
   const progress = 1 - left / session.totalMs
 
+  // Day → dusk → night grade, driven purely by session progress (see the
+  // scrims below). Dark mode starts one notch dimmer; time then darkens
+  // further on top of that, it never brightens it.
+  const dayBrightness = dark ? 0.6 : 1
+  const brightness = dayBrightness * (1 - 0.3 * progress)
+  const saturate = (dark ? 0.9 : 1) * (1 - 0.15 * progress)
+  const duskGlow = progress < 0.5 ? (progress / 0.5) * 0.18 : ((1 - progress) / 0.5) * 0.18
+  const nightVeil = progress > 0.4 ? ((progress - 0.4) / 0.6) * 0.45 : 0
+
   return (
     <motion.div
       ref={containerRef}
@@ -86,17 +95,29 @@ export default function Focus() {
       onPointerMove={wake}
       onClick={wake}
     >
-      {/* The scene. A very slow zoom is the only motion — cinematic, not gamified.
-          Reduced motion holds it still. */}
+      {/* The scene. A very slow zoom is the only motion on the image itself —
+          cinematic, not gamified. Reduced motion holds it still. */}
       <motion.img
         src={scene.bg}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: dark ? 'brightness(0.6) saturate(0.9)' : undefined }}
+        style={{ filter: `brightness(${brightness}) saturate(${saturate})` }}
         initial={reduce ? false : { scale: 1.0 }}
         animate={reduce ? {} : { scale: 1.08 }}
         transition={{ duration: session.totalMs / 1000, ease: 'linear' }}
       />
+      {/* Day → dusk → night: the whole session slowly repaints the scene's
+          light, the way an hours-long study stream drifts into evening — too
+          slow to catch mid-motion, obvious comparing start to end. A warm glow
+          peaks at mid-session then a cool veil deepens through to the close. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 25%, rgba(255,170,90,0.9), transparent 65%)',
+          opacity: duskGlow,
+        }}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[#0a1130]" style={{ opacity: nightVeil }} />
       {/* A whisper of movement over the still art — sits above the image but
           below the scrims, so it never competes with the timer for attention. */}
       <FocusAmbience theme={theme} />

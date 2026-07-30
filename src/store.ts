@@ -13,6 +13,11 @@ export type Task = {
   completedAt?: string
 }
 export type Exam = { id: string; courseId: string; title: string; date: string }
+/** A loose reminder with no course and no day — "email Chen," "book a
+ *  dermatologist." Deliberately not a Task: it has none of courseId/minutes/
+ *  dueDate, so it can never leak into the scheduler, the week planner's
+ *  unscheduled pool, or the ICS export. */
+export type QuickTask = { id: string; title: string; done: boolean }
 
 // Course identity colors drawn from the locked brand palette (Fern, Olive
 // Bark, Golden Earth, Camel, Lime Moss 2, lightened Prussian). The goldenrod
@@ -78,6 +83,7 @@ type State = {
   courses: Course[]
   tasks: Task[]
   exams: Exam[]
+  quickTasks: QuickTask[]
   dailyCap: number
   theme: ThemeKey
   mode: ModeKey
@@ -96,9 +102,14 @@ type State = {
   updateExam: (id: string, patch: Partial<Exam>) => void
   removeExam: (id: string) => void
   setDailyCap: (n: number) => void
+  addQuickTask: (title: string) => void
+  toggleQuickTask: (id: string) => void
+  removeQuickTask: (id: string) => void
   /** Puts deleted rows back — see captureCourse and the undo toasts. */
   restore: (payload: Restorable) => void
-  replaceAll: (s: Pick<State, 'courses' | 'tasks' | 'exams' | 'dailyCap' | 'theme' | 'mode'>) => void
+  replaceAll: (
+    s: Pick<State, 'courses' | 'tasks' | 'exams' | 'quickTasks' | 'dailyCap' | 'theme' | 'mode'>,
+  ) => void
 }
 
 export type Restorable = { courses?: Course[]; tasks?: Task[]; exams?: Exam[] }
@@ -127,6 +138,7 @@ export const useStore = create<State>()((set) => ({
   courses: [],
   tasks: [],
   exams: [],
+  quickTasks: [],
   dailyCap: 180,
   theme: 'forest',
   mode: 'auto',
@@ -158,6 +170,10 @@ export const useStore = create<State>()((set) => ({
     set((s) => ({ exams: s.exams.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
   removeExam: (id) => set((s) => ({ exams: s.exams.filter((e) => e.id !== id) })),
   setDailyCap: (n) => set({ dailyCap: n }),
+  addQuickTask: (title) => set((s) => ({ quickTasks: [...s.quickTasks, { id: uid(), title, done: false }] })),
+  toggleQuickTask: (id) =>
+    set((s) => ({ quickTasks: s.quickTasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) })),
+  removeQuickTask: (id) => set((s) => ({ quickTasks: s.quickTasks.filter((t) => t.id !== id) })),
   // Skips rows that already exist, so a double-tap on "ביטול" can't duplicate them.
   restore: ({ courses = [], tasks = [], exams = [] }) =>
     set((s) => {

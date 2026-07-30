@@ -82,7 +82,7 @@ export function Sheet({
 }
 
 /* ---------- Animated checkbox ---------- */
-function Checkbox({ done }: { done: boolean }) {
+export function Checkbox({ done }: { done: boolean }) {
   return (
     <span
       className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-colors ${

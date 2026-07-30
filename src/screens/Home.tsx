@@ -9,6 +9,7 @@ import {
   Leaf,
   BookOpen,
   CalendarCheck,
+  Plus,
 } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
 import { buildSchedule, unscheduled, overdue } from '../schedule'
@@ -25,7 +26,7 @@ import {
   monthCells,
   formatHeShort,
 } from '../utils'
-import { TaskRow, LeafBurst, Card } from '../ui'
+import { TaskRow, LeafBurst, Card, Checkbox, inputClass } from '../ui'
 import { useFocus, FOCUS_MINUTES, DEFAULT_FOCUS_MINUTES } from '../focus'
 import { CanopyScene } from '../CanopyScene'
 import { auth } from '../firebase'
@@ -181,6 +182,8 @@ export default function Home() {
           <FocusTimer className="lg:min-h-0 lg:flex-1" />
         </div>
       </div>
+
+      <QuickTasks />
 
       {/* Row 2: supporting cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -342,6 +345,86 @@ function greetingHe() {
   if (h < 17) return 'צהריים טובים'
   if (h < 21) return 'ערב טוב'
   return 'לילה טוב'
+}
+
+/**
+ * Loose reminders that don't belong to any course or day — "לשלוח הודעה
+ * ליובל", "לקבוע תור לרופא עור." A plain running checklist, not a scheduled
+ * task: nothing here ever competes with today's plan or the week planner.
+ */
+function QuickTasks() {
+  const { quickTasks, addQuickTask, toggleQuickTask, removeQuickTask } = useStore()
+  const [title, setTitle] = useState('')
+
+  const submit = () => {
+    const t = title.trim()
+    if (!t) return
+    addQuickTask(t)
+    setTitle('')
+  }
+
+  return (
+    <Card className="p-4">
+      <h2 className="mb-3 font-bold text-ink">משימות שוטפות</h2>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+        className="mb-3 flex gap-2"
+      >
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="לשלוח הודעה, לקבוע תור..."
+          className={`${inputClass} py-1.5 text-sm`}
+        />
+        <button
+          type="submit"
+          aria-label="הוסף משימה"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary transition-colors hover:bg-primary/15"
+        >
+          <Plus weight="bold" size={18} />
+        </button>
+      </form>
+
+      {quickTasks.length === 0 ? (
+        <p className="text-sm text-muted">אין משימות שוטפות כרגע.</p>
+      ) : (
+        <ul className="divide-y divide-line/70">
+          <AnimatePresence mode="popLayout">
+            {quickTasks.map((t) => (
+              <motion.li
+                key={t.id}
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                className="flex items-center gap-3 py-2.5"
+              >
+                <button onClick={() => toggleQuickTask(t.id)} aria-label={t.done ? 'בטל סימון' : 'סמן כהושלם'}>
+                  <Checkbox done={t.done} />
+                </button>
+                <button onClick={() => toggleQuickTask(t.id)} className="min-w-0 flex-1 text-right">
+                  <span className={`truncate text-sm ${t.done ? 'text-muted line-through' : 'text-ink'}`}>
+                    {t.title}
+                  </span>
+                </button>
+                <button
+                  onClick={() => removeQuickTask(t.id)}
+                  aria-label="מחק משימה"
+                  className="shrink-0 rounded-full px-1.5 text-sm text-muted transition-colors hover:text-accent"
+                >
+                  ✕
+                </button>
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ul>
+      )}
+    </Card>
+  )
 }
 
 /** Honest weekly numbers only: hours studied, tasks finished, active days.
