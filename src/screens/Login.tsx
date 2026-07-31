@@ -45,7 +45,7 @@ export default function Login() {
         {busy ? 'מתחבר…' : 'התחברות עם Google'}
       </motion.button>
 
-      {err && <p className="mt-3 text-sm text-accent">{err}</p>}
+      {err && <p className="mt-3 text-sm text-accent-text">{err}</p>}
 
       <p className="mt-6 text-xs text-muted">התחברות בהקשה אחת. בלי סיסמאות.</p>
     </div>

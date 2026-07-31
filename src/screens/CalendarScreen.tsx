@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { CaretRight, CaretLeft, Plus, PencilSimple, Trash } from '@phosphor-icons/react'
+import { CaretRight, CaretLeft, Plus, PencilSimple, Trash, PushPin } from '@phosphor-icons/react'
 import { useStore, type Course, type Exam, type Task } from '../store'
 import { buildSchedule } from '../schedule'
 import { todayIso, monthLabel, formatHe, examLabel, monthCells } from '../utils'
@@ -103,7 +103,7 @@ export default function CalendarScreen() {
                 <span>{dayNum}</span>
                 {dayExams.length > 0 && (
                   <span
-                    className={`w-full truncate rounded px-0.5 text-[8px] font-medium leading-tight ${
+                    className={`w-full truncate rounded px-0.5 text-[9px] font-medium leading-tight ${
                       isToday ? 'bg-on-primary/25 text-on-primary' : 'bg-accent-soft text-ink'
                     }`}
                   >
@@ -188,8 +188,9 @@ function DaySheet({
           const c = courseById.get(e.courseId)
           return (
             <div key={e.id} className="flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-3 font-medium text-ink">
+              <PushPin weight="fill" size={16} className="shrink-0 text-accent-text" />
               <span className="min-w-0 flex-1">
-                📌 {examLabel(e.title, c?.name)}
+                {examLabel(e.title, c?.name)}
                 <span className="text-sm text-muted">
                   {' '}
                   · {c?.emoji} {c?.name}

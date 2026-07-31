@@ -10,6 +10,7 @@ import {
   BookOpen,
   CalendarCheck,
   Plus,
+  X,
 } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
 import { buildSchedule, unscheduled, overdue } from '../schedule'
@@ -414,9 +415,9 @@ function QuickTasks() {
                 <button
                   onClick={() => removeQuickTask(t.id)}
                   aria-label="מחק משימה"
-                  className="shrink-0 rounded-full px-1.5 text-sm text-muted transition-colors hover:text-accent"
+                  className="shrink-0 rounded-full p-1 text-muted transition-colors hover:text-accent-text"
                 >
-                  ✕
+                  <X size={15} />
                 </button>
               </motion.li>
             ))}
@@ -452,8 +453,8 @@ function WeeklySummary() {
       <ul className="space-y-3">
         {rows.map(({ Icon, value, label }) => (
           <li key={label} className="flex items-center gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-soft">
-              <Icon size={20} className="text-accent" />
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent-soft">
+              <Icon size={20} className="text-accent-text" />
             </span>
             <span className="min-w-0">
               <span className="block text-lg font-bold tabular-nums leading-tight text-ink">{value}</span>

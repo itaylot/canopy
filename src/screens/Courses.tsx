@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Plus, Trash, PencilSimple } from '@phosphor-icons/react'
+import { Plus, Trash, PencilSimple, PushPin } from '@phosphor-icons/react'
 import { useStore, captureCourse, COURSE_PALETTES, COURSE_COLORS, COURSE_EMOJIS, type Course } from '../store'
 import { toast } from '../toast'
 import { goTo } from '../nav'
@@ -232,8 +232,9 @@ function CourseDetail({
       {course && (
         <div className="space-y-4">
           {exam && (
-            <div className="rounded-xl bg-accent-soft px-4 py-2.5 text-sm text-ink">
-              📌 {examLabel(exam.title, course.name)} · {formatHeShort(exam.date)}
+            <div className="flex items-center gap-1.5 rounded-xl bg-accent-soft px-4 py-2.5 text-sm text-ink">
+              <PushPin weight="fill" size={15} className="shrink-0 text-accent-text" />
+              {examLabel(exam.title, course.name)} · {formatHeShort(exam.date)}
             </div>
           )}
 
@@ -309,7 +310,7 @@ function CourseDetail({
 
           <button
             onClick={() => onDeleteCourse(course)}
-            className="flex w-full items-center justify-center gap-1.5 py-2 text-sm text-muted transition-colors hover:text-accent"
+            className="flex w-full items-center justify-center gap-1.5 py-2 text-sm text-muted transition-colors hover:text-accent-text"
           >
             <Trash size={16} /> מחק קורס
           </button>

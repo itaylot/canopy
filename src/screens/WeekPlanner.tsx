@@ -7,6 +7,7 @@ import {
   ArrowCounterClockwise,
   Tray,
   WarningCircle,
+  PushPin,
 } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
 import { buildSchedule, unscheduled, dayLoad, overdue } from '../schedule'
@@ -189,7 +190,7 @@ export default function WeekPlanner() {
               {load > 0 && (
                 <p
                   className={`mb-1.5 text-[10px] tabular-nums ${
-                    load > dailyCap ? 'font-semibold text-accent' : 'text-muted'
+                    load > dailyCap ? 'font-semibold text-accent-text' : 'text-muted'
                   }`}
                   title={load > dailyCap ? 'מעבר למכסה היומית שהגדרת' : undefined}
                 >
@@ -199,8 +200,9 @@ export default function WeekPlanner() {
               )}
 
               {dayExams.map((e) => (
-                <div key={e.id} className="mb-1.5 rounded-lg bg-accent-soft px-2 py-1.5 text-[11px] font-medium text-ink">
-                  📌 {examLabel(e.title, courseById.get(e.courseId)?.name)}
+                <div key={e.id} className="mb-1.5 flex items-center gap-1 rounded-lg bg-accent-soft px-2 py-1.5 text-[11px] font-medium text-ink">
+                  <PushPin weight="fill" size={11} className="shrink-0 text-accent-text" />
+                  <span className="truncate">{examLabel(e.title, courseById.get(e.courseId)?.name)}</span>
                 </div>
               ))}
 
@@ -221,9 +223,6 @@ export default function WeekPlanner() {
                 </AnimatePresence>
               </div>
 
-              {dayTasks.length === 0 && dayExams.length === 0 && (
-                <p className="py-2 text-center text-[11px] text-muted">—</p>
-              )}
             </div>
           )
         })}
@@ -236,7 +235,7 @@ export default function WeekPlanner() {
         <div className="rounded-2xl bg-surface p-3 shadow-card ring-1 ring-accent/40">
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink">
-              <WarningCircle size={16} className="text-accent" /> משימות שלא הושלמו
+              <WarningCircle size={16} className="text-accent-text" /> משימות שלא הושלמו
             </h2>
             <span className="text-[11px] tabular-nums text-muted">{overdueTasks.length}</span>
           </div>
@@ -442,7 +441,7 @@ function PlannerChip({
           {course ? `${course.name} · ` : ''}
           {formatDuration(task.minutes)}
         </span>
-        {note && <span className="block truncate text-[10px] leading-tight text-accent">תוכננה ל{note}</span>}
+        {note && <span className="block truncate text-[10px] leading-tight text-accent-text">תוכננה ל{note}</span>}
       </button>
     </motion.div>
   )

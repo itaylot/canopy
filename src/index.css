@@ -15,6 +15,7 @@
   --color-on-primary: var(--on-primary);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
   --color-bark: var(--bark);
   --color-tree-2: var(--tree-2);
   --color-line: var(--line);
@@ -46,6 +47,9 @@
   --bark: #714f21;
   --accent: #b88a3e;
   --accent-soft: #f4e8cf;
+  /* Darkened for use as text/icon color on bg/surface — --accent itself only
+     hits ~2.9:1 there, well under WCAG AA's 4.5:1 for body text. */
+  --accent-text: #8f6b30;
   --line: #e8e6d6;
 }
 
@@ -61,6 +65,7 @@
   --bark: #b5794a;
   --accent: #d97e46;
   --accent-soft: #f7e6d8;
+  --accent-text: #ad5824;
   --line: #dbe9e5;
 }
 
@@ -76,6 +81,7 @@
   --bark: #b07d4a;
   --accent: #cf7f3c;
   --accent-soft: #f4e5d2;
+  --accent-text: #9d5c27;
   --line: #d5e0ea;
 }
 
@@ -91,6 +97,7 @@
   --bark: #b07d4a;
   --accent: #ec5c33;
   --accent-soft: #fbe0d6;
+  --accent-text: #c63a12;
   --line: #dcdfec;
 }
 
@@ -115,6 +122,8 @@
   --bark: #ca9d59;
   --accent: #ca9d59;
   --accent-soft: #3b2f16;
+  /* Already passes AA against dark bg/surface (~6.5:1) — no darkening needed. */
+  --accent-text: #ca9d59;
   --line: #1d3550;
 }
 
@@ -131,6 +140,7 @@
   --bark: #d0a06a;
   --accent: #e0995e;
   --accent-soft: #37291a;
+  --accent-text: #e0995e;
   --line: #16414f;
 }
 
@@ -147,6 +157,7 @@
   --bark: #cf9a5f;
   --accent: #dc9a5a;
   --accent-soft: #322616;
+  --accent-text: #dc9a5a;
   --line: #1b3448;
 }
 
@@ -163,6 +174,7 @@
   --bark: #cf9a5f;
   --accent: #ff7a54;
   --accent-soft: #34211a;
+  --accent-text: #ff7a54;
   --line: #262a4e;
 }
 

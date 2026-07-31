@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useState, type ReactNode } from 'react'
-import { DotsThree, PencilSimple, Trash, Timer } from '@phosphor-icons/react'
+import { DotsThree, PencilSimple, Trash, Timer, X } from '@phosphor-icons/react'
 import type { Course, Task } from './store'
 import { useToasts, type Toast as ToastType } from './toast'
 import { useCourseColor } from './theme'
@@ -211,7 +211,7 @@ export function TaskRow({
           {course ? `${course.name} · ` : ''}
           {formatDuration(task.minutes)}
         </div>
-        {note && <div className="mt-0.5 truncate text-[11px] text-accent">{note}</div>}
+        {note && <div className="mt-0.5 truncate text-[11px] text-accent-text">{note}</div>}
       </button>
 
       {onFocus && !task.done && (
@@ -238,10 +238,10 @@ export function TaskRow({
         onDelete && (
           <button
             onClick={onDelete}
-            className="shrink-0 rounded-full px-1.5 text-sm text-muted transition-colors hover:text-accent"
+            className="shrink-0 rounded-full p-1 text-muted transition-colors hover:text-accent-text"
             aria-label="מחק משימה"
           >
-            ✕
+            <X size={15} />
           </button>
         )
       )}
@@ -369,9 +369,9 @@ function ToastRow({ toast: t, onDone }: { toast: ToastType; onDone: () => void }
       <button
         onClick={onDone}
         aria-label="סגור"
-        className="shrink-0 rounded-lg px-1.5 text-white/60 transition-colors hover:text-white"
+        className="shrink-0 rounded-lg p-1 text-white/60 transition-colors hover:text-white"
       >
-        ✕
+        <X size={15} />
       </button>
     </motion.div>
   )

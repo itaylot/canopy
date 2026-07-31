@@ -1,5 +1,5 @@
 import { useEffect, type ComponentType } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { House, CalendarBlank, BookOpen, User, Kanban } from '@phosphor-icons/react'
 import type { User as FirebaseUser } from 'firebase/auth'
 import Home from './screens/Home'
@@ -182,11 +182,12 @@ function MainApp({ user }: { user: FirebaseUser }) {
 }
 
 function Splash() {
+  const reduce = useReducedMotion()
   return (
     <div className="grid min-h-[100dvh] place-items-center bg-bg">
       <motion.div
-        animate={{ scale: [1, 1.06, 1] }}
-        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+        animate={reduce ? {} : { scale: [1, 1.06, 1] }}
+        transition={{ duration: 1.4, repeat: reduce ? 0 : Infinity, ease: 'easeInOut' }}
         className="grid h-16 w-16 place-items-center rounded-2xl bg-surface shadow-card"
       >
         <CanopyMark size={36} />
