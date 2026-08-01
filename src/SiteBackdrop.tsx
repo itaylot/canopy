@@ -16,7 +16,7 @@ import type { ThemeKey } from './store'
  * just the focus overlay, so constant motion here would work against the
  * calm the rest of the app is built around.
  */
-const TILE = 72
+const TILE = 140
 
 function Leaf() {
   return <path d="M8 1.5C4 2 2 5 2 9c0 2.8 1.9 4.6 4.5 4.9-.4-2-.2-4 .5-5.9.7 1.9.9 3.9.5 5.9C10.1 13.6 12 11.8 12 9c0-4-2-7.5-4-7.5Z" />
@@ -63,12 +63,12 @@ export function SiteBackdrop({ theme }: { theme: ThemeKey }) {
   const Motif = MOTIF[theme]
   return (
     <svg
-      className="pointer-events-none fixed inset-0 -z-10 h-full w-full text-muted opacity-35"
+      className="pointer-events-none fixed inset-0 -z-10 h-full w-full text-muted opacity-[0.16]"
       aria-hidden
     >
       <defs>
         <pattern id="site-backdrop" width={TILE} height={TILE} patternUnits="userSpaceOnUse" patternTransform="rotate(-12)">
-          <g transform={`translate(${TILE / 2 - 8} ${TILE / 2 - 8}) scale(1.4)`} fill="currentColor">
+          <g transform={`translate(${TILE / 2 - 8} ${TILE / 2 - 8})`} fill="currentColor">
             <Motif />
           </g>
         </pattern>
