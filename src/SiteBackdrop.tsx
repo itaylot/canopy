@@ -1,32 +1,22 @@
 import type { ThemeKey } from './store'
 
 /**
- * A whisper of the theme's own visual language scattered very faintly behind
- * everything — replaces a generic dot grid with the same small motifs already
- * drawn on the focus dial's rim (leaf / wave / snowflake / board), so empty
- * canvas reads as "this app" rather than as a stock texture.
+ * A faint repeating pattern behind everything, built from the theme's own
+ * motif (the same leaf / wave / snowflake / board drawn on the focus dial's
+ * rim) instead of a generic dot grid — empty canvas echoes the app's own
+ * visual language instead of a stock texture.
  *
- * Fixed, not animated: this sits behind every screen all the time, not just
- * the immersive focus overlay, so constant motion here would be the opposite
- * of quiet. Positions are a hand-placed table, never Math.random(), so a
- * re-render can't reshuffle them — same reasoning as FocusAmbience/Stars.
+ * An SVG <pattern> tile, not a CSS background-image data URI: a data URI is
+ * rendered in an isolated context that can't see this document's CSS
+ * variables, so --muted would have to be baked in as eight separate
+ * hardcoded hex fallbacks (one per theme x mode). A live <pattern> in the DOM
+ * reads currentColor normally, one path.
+ *
+ * Static, not animated — this sits behind every screen at all times, not
+ * just the focus overlay, so constant motion here would work against the
+ * calm the rest of the app is built around.
  */
-
-/** [xPercent, yPercent, scale, rotateDeg] */
-const SPOTS = [
-  [6, 12, 1, -8],
-  [92, 8, 0.8, 14],
-  [14, 88, 1.1, 5],
-  [85, 92, 0.9, -12],
-  [48, 5, 0.7, 0],
-  [4, 50, 0.85, 10],
-  [95, 55, 1, -6],
-  [30, 96, 0.8, 8],
-  [65, 96, 0.9, -4],
-  [22, 30, 0.6, 18],
-  [78, 34, 0.65, -16],
-  [55, 68, 0.75, 6],
-] as const
+const TILE = 72
 
 function Leaf() {
   return <path d="M8 1.5C4 2 2 5 2 9c0 2.8 1.9 4.6 4.5 4.9-.4-2-.2-4 .5-5.9.7 1.9.9 3.9.5 5.9C10.1 13.6 12 11.8 12 9c0-4-2-7.5-4-7.5Z" />
@@ -72,23 +62,18 @@ const MOTIF: Record<ThemeKey, () => React.JSX.Element> = {
 export function SiteBackdrop({ theme }: { theme: ThemeKey }) {
   const Motif = MOTIF[theme]
   return (
-    // --line (the hairline-divider token) is only ~1.15:1 against --bg by
-    // design — perfect for a 1px border, invisible for a 20px shape. --muted
-    // actually has contrast to spare, dialed back with opacity instead.
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden text-muted opacity-75" aria-hidden>
-      {SPOTS.map(([x, y, scale, rotate], i) => (
-        <svg
-          key={i}
-          viewBox="0 0 16 16"
-          width={20 * scale}
-          height={20 * scale}
-          fill="currentColor"
-          className="absolute"
-          style={{ left: `${x}%`, top: `${y}%`, transform: `translate(-50%, -50%) rotate(${rotate}deg)` }}
-        >
-          <Motif />
-        </svg>
-      ))}
-    </div>
+    <svg
+      className="pointer-events-none fixed inset-0 -z-10 h-full w-full text-muted opacity-35"
+      aria-hidden
+    >
+      <defs>
+        <pattern id="site-backdrop" width={TILE} height={TILE} patternUnits="userSpaceOnUse" patternTransform="rotate(-12)">
+          <g transform={`translate(${TILE / 2 - 8} ${TILE / 2 - 8}) scale(1.4)`} fill="currentColor">
+            <Motif />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#site-backdrop)" />
+    </svg>
   )
 }
