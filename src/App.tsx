@@ -71,7 +71,7 @@ function MainApp({ user }: { user: FirebaseUser }) {
   const dark = useResolvedDark()
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-bg md:max-w-2xl lg:grid lg:max-w-7xl lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-6">
+    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col md:max-w-2xl lg:grid lg:max-w-7xl lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:px-6">
       {/* Desktop sidebar - first grid column, which in RTL is the right side */}
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:py-6">
         {/* Banner art per theme, hidden in dark mode (the bright illustration
@@ -184,7 +184,7 @@ function MainApp({ user }: { user: FirebaseUser }) {
 function Splash() {
   const reduce = useReducedMotion()
   return (
-    <div className="grid min-h-[100dvh] place-items-center bg-bg">
+    <div className="grid min-h-[100dvh] place-items-center">
       <motion.div
         animate={reduce ? {} : { scale: [1, 1.06, 1] }}
         transition={{ duration: 1.4, repeat: reduce ? 0 : Infinity, ease: 'easeInOut' }}
@@ -198,7 +198,7 @@ function Splash() {
 
 function ConfigNeeded() {
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
+    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
       <CanopyMark size={44} />
       <h1 className="text-xl font-bold text-ink">כמעט מוכן</h1>
       <p className="text-muted">

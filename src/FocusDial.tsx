@@ -21,11 +21,17 @@ export function FocusDial({
 }) {
   const index = Math.max(0, presets.indexOf(value))
   const wrapRef = useRef<HTMLDivElement>(null)
-  const [dragging, setDragging] = useState(false)
+  // The raw pointer angle while a drag is in progress, null when it isn't.
+  // The handle renders at this angle instead of the committed preset's angle
+  // so it tracks the pointer continuously — only 6 presets sit across 270°,
+  // so snapping the handle itself (with a spring chasing each snap) made it
+  // visibly lag behind the actual pointer position during a drag.
+  const [dragAngle, setDragAngle] = useState<number | null>(null)
 
-  const angle = angleFor(index, presets.length)
-  const handlePt = pt(angle, R_HANDLE)
-  const progressD = arcPath(START, angle, R_ARC)
+  const committedAngle = angleFor(index, presets.length)
+  const renderAngle = dragAngle ?? committedAngle
+  const handlePt = pt(renderAngle, R_HANDLE)
+  const progressD = arcPath(START, renderAngle, R_ARC)
   const trackD = arcPath(START, START + SWEEP, R_ARC)
 
   // clientX/Y are real screen pixels; the dial is drawn in a 220x220 viewBox
@@ -40,14 +46,19 @@ export function FocusDial({
   }
 
   const pick = (clientX: number, clientY: number) => {
-    const next = presets[nearestIndex(angleFromPointer(clientX, clientY), presets.length)]
+    const raw = angleFromPointer(clientX, clientY)
+    setDragAngle(raw)
+    const next = presets[nearestIndex(raw, presets.length)]
     if (next !== value) onChange(next)
   }
 
   useEffect(() => {
-    if (!dragging) return
+    if (dragAngle === null) return
     const onMove = (e: PointerEvent) => pick(e.clientX, e.clientY)
-    const onUp = () => setDragging(false)
+    // Releasing clears dragAngle, so the handle springs from wherever the
+    // pointer let go to the exact committed preset — a deliberate "settle"
+    // rather than the mid-drag 1:1 tracking above.
+    const onUp = () => setDragAngle(null)
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     return () => {
@@ -58,10 +69,10 @@ export function FocusDial({
     // per drag-frame would be wasteful, so this intentionally only re-runs
     // when the drag itself starts or stops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragging])
+  }, [dragAngle === null])
 
   return (
-    <div ref={wrapRef} className="relative mx-auto h-[200px] w-[200px] shrink-0">
+    <div ref={wrapRef} className="relative mx-auto h-[200px] w-[200px] shrink-0 select-none">
       <img
         src={`/dial-${theme}.png`}
         alt=""
@@ -88,10 +99,7 @@ export function FocusDial({
       <svg
         viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
         className="absolute inset-0 h-full w-full touch-none cursor-grab rounded-full active:cursor-grabbing peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-primary"
-        onPointerDown={(e) => {
-          setDragging(true)
-          pick(e.clientX, e.clientY)
-        }}
+        onPointerDown={(e) => pick(e.clientX, e.clientY)}
       >
         {/* transparent, not none — SVG only hit-tests "painted" areas */}
         <circle cx={CX} cy={CY} r={R_HIT} fill="transparent" />
@@ -125,7 +133,7 @@ export function FocusDial({
           style={{ filter: 'drop-shadow(0 2px 4px rgb(0 0 0 / 0.35))' }}
           initial={false}
           animate={{ cx: handlePt.x, cy: handlePt.y }}
-          transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+          transition={dragAngle !== null ? { duration: 0 } : { type: 'spring', stiffness: 320, damping: 28 }}
         />
       </svg>
 
