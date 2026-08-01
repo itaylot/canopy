@@ -72,7 +72,10 @@ const MOTIF: Record<ThemeKey, () => React.JSX.Element> = {
 export function SiteBackdrop({ theme }: { theme: ThemeKey }) {
   const Motif = MOTIF[theme]
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden text-line" aria-hidden>
+    // --line (the hairline-divider token) is only ~1.15:1 against --bg by
+    // design — perfect for a 1px border, invisible for a 20px shape. --muted
+    // actually has contrast to spare, dialed back with opacity instead.
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden text-muted opacity-75" aria-hidden>
       {SPOTS.map(([x, y, scale, rotate], i) => (
         <svg
           key={i}
@@ -80,7 +83,7 @@ export function SiteBackdrop({ theme }: { theme: ThemeKey }) {
           width={20 * scale}
           height={20 * scale}
           fill="currentColor"
-          className="absolute opacity-60"
+          className="absolute"
           style={{ left: `${x}%`, top: `${y}%`, transform: `translate(-50%, -50%) rotate(${rotate}deg)` }}
         >
           <Motif />
