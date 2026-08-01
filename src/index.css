@@ -188,13 +188,9 @@ html, body, #root { height: 100%; }
 
 body {
   margin: 0;
+  /* Empty canvas gets its texture from <SiteBackdrop> (themed motifs), not
+     from a plain CSS pattern here. */
   background-color: var(--bg);
-  /* A whisper of texture so empty canvas (gaps between cards, safe-area
-     padding) doesn't read as blank/unfinished. Fixed so it stays put as the
-     page's canvas rather than scrolling with content. */
-  background-image: radial-gradient(circle, var(--line) 1px, transparent 1px);
-  background-size: 22px 22px;
-  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;

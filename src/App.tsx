@@ -10,6 +10,7 @@ import Profile from './screens/Profile'
 import Login from './screens/Login'
 import Focus, { FocusBar } from './screens/Focus'
 import { CanopyMark, Toaster } from './ui'
+import { SiteBackdrop } from './SiteBackdrop'
 import { isConfigured } from './firebaseConfig'
 import { useAuth, useCloudSync } from './cloud'
 import { registerSW, applyUpdate } from './registerSW'
@@ -29,6 +30,7 @@ const TABS: { key: TabKey; label: string; short: string; Icon: typeof House; Scr
 
 export default function App() {
   const { user, loading } = useAuth()
+  const theme = useStore((s) => s.theme)
   useCloudSync(user)
   useApplyTheme()
 
@@ -40,6 +42,7 @@ export default function App() {
 
   return (
     <>
+      <SiteBackdrop theme={theme} />
       {!isConfigured ? (
         <ConfigNeeded />
       ) : loading ? (
