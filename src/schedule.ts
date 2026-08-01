@@ -35,7 +35,8 @@ export function buildSchedule(tasks: Task[]): DaySchedule {
 /** No day yet — waiting in the planner's pool. */
 export const unscheduled = (tasks: Task[]) => tasks.filter((t) => !t.done && !t.dueDate)
 
-/** Planned for today or later. */
+/** Planned for today or later. Only consumed by schedule.check.mjs, to assert
+ *  the three pending states never overlap or leave a task uncounted. */
 export const scheduled = (tasks: Task[], today: string) =>
   tasks.filter((t) => !t.done && t.dueDate && !isoLt(t.dueDate, today))
 

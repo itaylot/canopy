@@ -25,7 +25,6 @@ export const daysBetweenIso = (a: string, b: string) =>
   Math.round((parseIso(b).getTime() - parseIso(a).getTime()) / 86_400_000)
 
 export const isoLt = (a: string, b: string) => a < b
-export const isoLte = (a: string, b: string) => a <= b
 
 const heFull = new Intl.DateTimeFormat('he-IL', { weekday: 'long', day: 'numeric', month: 'long' })
 const heShort = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'long' })

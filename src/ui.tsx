@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DotsThree, PencilSimple, Trash, Timer, X } from '@phosphor-icons/react'
 import type { Course, Task } from './store'
 import { useToasts, type Toast as ToastType } from './toast'
@@ -34,9 +34,14 @@ export function Sheet({
   children: ReactNode
 }) {
   const reduce = useReducedMotion()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const previouslyFocused = useRef<HTMLElement | null>(null)
 
   // Escape closes the sheet, and the page behind it stops scrolling while it is
   // up — on a phone, a scrolling background under an open sheet feels broken.
+  // Opening also moves focus into the panel and closing returns it to whatever
+  // was focused before — without this, a keyboard user opening/closing any
+  // sheet (every form in the app) loses their place every time.
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -45,9 +50,12 @@ export function Sheet({
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', onKey)
+    previouslyFocused.current = document.activeElement as HTMLElement | null
+    panelRef.current?.focus()
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prevOverflow
+      previouslyFocused.current?.focus?.()
     }
   }, [open, onClose])
 
@@ -65,7 +73,9 @@ export function Sheet({
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
           <motion.div
-            className="relative z-10 max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-5 pb-[max(2rem,env(safe-area-inset-bottom))] shadow-2xl"
+            ref={panelRef}
+            tabIndex={-1}
+            className="relative z-10 max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-5 pb-[max(2rem,env(safe-area-inset-bottom))] shadow-2xl outline-none"
             initial={reduce ? { opacity: 0 } : { y: '100%' }}
             animate={reduce ? { opacity: 1 } : { y: 0 }}
             exit={reduce ? { opacity: 0 } : { y: '100%' }}
@@ -273,14 +283,40 @@ export type MenuItem = {
  *  backdrop, which also stops the click reaching whatever is underneath. */
 export function RowMenu({ items }: { items: MenuItem[] }) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const firstItemRef = useRef<HTMLButtonElement>(null)
+
+  // Closing always returns focus to the trigger — without it, a keyboard user
+  // who opens this menu has no way back to the row except tabbing past it.
+  const close = () => {
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  // Opening moves focus to the first action, and Escape closes — the backdrop
+  // click already handled the mouse case, but a keyboard user had no way to
+  // dismiss the menu without picking one of its actions.
+  useEffect(() => {
+    if (!open) return
+    firstItemRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
   return (
     <span className="relative shrink-0">
       <button
+        ref={triggerRef}
         onClick={(e) => {
           e.stopPropagation()
           setOpen((o) => !o)
         }}
         aria-label="אפשרויות"
+        aria-haspopup="menu"
         aria-expanded={open}
         className="grid h-8 w-8 place-items-center rounded-full text-muted transition-colors hover:bg-primary-soft hover:text-ink"
       >
@@ -290,19 +326,22 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
       <AnimatePresence>
         {open && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+            <div className="fixed inset-0 z-40" onClick={close} />
             <motion.div
+              role="menu"
               initial={{ opacity: 0, scale: 0.94, y: -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94 }}
               transition={{ duration: 0.14 }}
               className="absolute left-0 top-9 z-50 w-40 overflow-hidden rounded-xl bg-surface py-1 text-right shadow-lg ring-1 ring-line"
             >
-              {items.map(({ label, Icon, onClick, danger }) => (
+              {items.map(({ label, Icon, onClick, danger }, i) => (
                 <button
                   key={label}
+                  ref={i === 0 ? firstItemRef : undefined}
+                  role="menuitem"
                   onClick={() => {
-                    setOpen(false)
+                    close()
                     onClick()
                   }}
                   className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors ${
@@ -423,7 +462,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export const inputClass =
-  'w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-ink outline-none transition-colors focus:border-primary'
+  'w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-ink outline-none transition-colors focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/50'
 
 export function PrimaryButton({
   children,

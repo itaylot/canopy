@@ -83,7 +83,7 @@ export default function Profile() {
           </select>
         </Field>
         <p className="text-xs text-muted">
-          בתכנון השבוע, יום שחורג מהמכסה הזו יסומן כעמוס. השיבוץ עצמו תמיד שלך — שום משימה לא
+          בתכנון השבוע, יום שחורג מהמכסה הזו יסומן כעמוס. השיבוץ עצמו תמיד שלך. שום משימה לא
           משובצת אוטומטית.
         </p>
       </Card>
@@ -137,7 +137,7 @@ export default function Profile() {
         <h2 className="mb-1 font-bold text-ink">ייצוא ליומן</h2>
         <p className="mb-3 text-xs text-muted">
           מוריד קובץ <code className="text-ink">.ics</code> עם כל המבחנים והמשימות המשובצות. אפשר לייבא
-          אותו ל-Google Calendar, לאאוטלוק או ליומן של האייפון. זו תמונת מצב — שינויים באפליקציה לא
+          אותו ל-Google Calendar, לאאוטלוק או ליומן של האייפון. זו תמונת מצב. שינויים באפליקציה לא
           יתעדכנו ביומן, וצריך לייצא שוב.
         </p>
         <button

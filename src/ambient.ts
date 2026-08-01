@@ -64,7 +64,7 @@ export function startAmbient(theme: ThemeKey) {
   src.connect(filter).connect(master).connect(ctx.destination)
   src.start()
   lfo.start()
-  void ctx.resume()
+  void ctx.resume().catch(() => {})
 
   voice = { ctx, master, lfo, nodes: [src, filter] }
 }

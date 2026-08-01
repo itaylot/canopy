@@ -431,10 +431,18 @@ function PlannerChip({
       <button
         onClick={tap(onToggle)}
         aria-label={task.done ? 'בטל סימון' : 'סמן כהושלם'}
-        className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors ${
-          task.done ? 'border-primary bg-primary' : 'border-line'
-        }`}
-      />
+        className="relative shrink-0"
+      >
+        {/* Invisible hit-area padding: the visual dot stays tiny (this chip is
+            dense by design), but a bare 14px target fails the WCAG 2.2 AA
+            24px minimum. A descendant still bubbles clicks to this button. */}
+        <span className="absolute -inset-[5px]" />
+        <span
+          className={`block h-3.5 w-3.5 rounded-full border-2 transition-colors ${
+            task.done ? 'border-primary bg-primary' : 'border-line'
+          }`}
+        />
+      </button>
       <button onClick={tap(onPick)} className="min-w-0 flex-1 cursor-grab text-right active:cursor-grabbing">
         <span className="block truncate text-[11px] font-semibold leading-tight text-ink">{task.title}</span>
         <span className="block truncate text-[10px] leading-tight text-muted">

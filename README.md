@@ -84,7 +84,7 @@ Your data never lives in this folder — it's in your Firebase project — so up
 
 - All of your data lives in **your own Firebase project**, in a single Firestore document per user (`users/{uid}`), locked by [security rules](firestore.rules) so only you can read or write it.
 - Sign-in is Google OAuth only — the app never sees or stores a password.
-- No analytics, no telemetry, no third-party trackers. The only network calls are to your Firebase project.
+- No analytics, no telemetry, no third-party trackers. The only network calls are to your Firebase project and to Google Fonts (for the interface typeface).
 - The Firebase keys in [`src/firebaseConfig.ts`](src/firebaseConfig.ts) are public by design (they identify the project; the security rules are what protect the data).
 
 ## 🛠️ Engineering challenges solved

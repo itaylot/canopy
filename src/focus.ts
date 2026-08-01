@@ -24,14 +24,6 @@ export const FOCUS_SCENES: Record<ThemeKey, FocusScene> = {
   snowpark: { bg: '/focus-snowpark.webp', anchor: { x: 'right', y: 'bottom' } },
 }
 
-/** @deprecated use FOCUS_SCENES[theme].bg */
-export const FOCUS_BG: Record<ThemeKey, string> = {
-  forest: FOCUS_SCENES.forest.bg,
-  sea: FOCUS_SCENES.sea.bg,
-  snow: FOCUS_SCENES.snow.bg,
-  snowpark: FOCUS_SCENES.snowpark.bg,
-}
-
 /**
  * A focus session.
  *
