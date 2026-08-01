@@ -30,6 +30,7 @@ import {
 import { TaskRow, LeafBurst, Card, Checkbox, inputClass } from '../ui'
 import { useFocus, FOCUS_MINUTES, DEFAULT_FOCUS_MINUTES } from '../focus'
 import { CanopyScene } from '../CanopyScene'
+import { FocusDial } from '../FocusDial'
 import { auth } from '../firebase'
 import { goTo } from '../nav'
 
@@ -264,7 +265,7 @@ function OverdueList({
   return (
     <div className="divide-y divide-line/70">
       <p className="pb-1 text-xs text-muted">
-        משימות שתכננת ולא סימנת. הן לא נספרות בעומס של היום — אתה מחליט מה לעשות איתן.
+        משימות שתכננת ולא סימנת. הן לא נספרות בעומס של היום. אתה מחליט מה לעשות איתן.
       </p>
       <AnimatePresence mode="popLayout">
         {tasks.map((t) => (
@@ -307,7 +308,7 @@ function EmptyToday() {
       : tasks.length === 0
         ? {
             title: 'יש קורסים, אין עדיין משימות.',
-            note: 'הוסף את כל המשימות של הקורס בבת אחת — השיבוץ מגיע אחר כך.',
+            note: 'הוסף את כל המשימות של הקורס בבת אחת. השיבוץ מגיע אחר כך.',
             action: 'הוסף משימות',
             tab: 'courses' as const,
           }
@@ -320,7 +321,7 @@ function EmptyToday() {
             }
           : {
               title: 'אין משימות להיום.',
-              note: 'הכול משובץ לימים אחרים — יום פנוי הוא תוצאה תקינה.',
+              note: 'הכול משובץ לימים אחרים. יום פנוי הוא תוצאה תקינה.',
               action: 'לתכנון השבוע',
               tab: 'plan' as const,
             }
@@ -529,38 +530,24 @@ function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; t
  */
 function FocusTimer({ className = '' }: { className?: string }) {
   const start = useFocus((s) => s.start)
+  const theme = useStore((s) => s.theme)
   const [minutes, setMinutes] = useState(DEFAULT_FOCUS_MINUTES)
 
   return (
-    <Card className={`flex flex-col p-4 ${className}`}>
-      <h2 className="mb-3 flex items-center gap-1.5 font-bold text-ink">
+    <Card className={`flex flex-col items-center gap-4 p-4 ${className}`}>
+      <h2 className="self-start flex items-center gap-1.5 font-bold text-ink">
         <Timer size={18} className="text-primary" /> זמן מיקוד
       </h2>
 
-      <div className="flex flex-1 flex-col justify-center gap-3">
-        <div className="flex flex-wrap gap-1.5">
-          {FOCUS_MINUTES.map((m) => (
-            <button
-              key={m}
-              onClick={() => setMinutes(m)}
-              className={`rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums transition-colors ${
-                m === minutes ? 'bg-primary text-on-primary' : 'bg-primary-soft text-primary hover:bg-primary/15'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-          <span className="self-center text-xs text-muted">דקות</span>
-        </div>
+      <FocusDial theme={theme} presets={FOCUS_MINUTES} value={minutes} onChange={setMinutes} />
 
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => start({ minutes }, Date.now())}
-          className="flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-on-primary"
-        >
-          <Play weight="fill" size={16} /> כניסה למצב מיקוד
-        </motion.button>
-      </div>
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        onClick={() => start({ minutes }, Date.now())}
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-on-primary"
+      >
+        <Play weight="fill" size={16} /> כניסה למצב מיקוד
+      </motion.button>
     </Card>
   )
 }

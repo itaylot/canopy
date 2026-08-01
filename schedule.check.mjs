@@ -13,6 +13,7 @@ import { zoneAt, tapGuard } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
 import { isDark, normalizeThemeMode, themedCourseColor, COURSE_PALETTES } from './src/store.ts'
 import { msLeft, isPaused, isDone } from './src/focus.ts'
+import { angleFor, pt, nearestIndex, clampAngle, START, SWEEP } from './src/dialGeometry.ts'
 
 const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
@@ -440,4 +441,41 @@ assert.ok(!isDone(sess, T0))
 assert.ok(isDone(running(T0), T0 + 1), 'past the end time = done')
 assert.ok(!isDone(paused(5), T0 + 10_000), 'a paused session is never done')
 
-console.log('schedule.check.mjs: all 40 checks passed ✓')
+/* ---------------------------------------------------------------------------
+ * FocusDial geometry (src/dialGeometry.ts)
+ *
+ * A 270° sweep, 0 = top, clockwise+, 90° gap at the bottom. These pin the
+ * math a pointer drag depends on — angleFor/pt define where each preset and
+ * the handle sit, nearestIndex is what a drag snaps to, and clampAngle is
+ * what keeps a drag inside the sweep.
+ * ------------------------------------------------------------------------- */
+
+// 41. The sweep's two ends land exactly on START and START+SWEEP.
+assert.equal(angleFor(0, 6), START)
+assert.equal(angleFor(5, 6), START + SWEEP)
+
+// 42. pt() places angle 0 straight up from center, and 90° directly to the
+//     right — the "0 = top, clockwise+" convention every other calculation
+//     in this file assumes.
+assert.deepEqual(pt(0, 10), { x: 110, y: 100 })
+assert.deepEqual(pt(90, 10), { x: 120, y: 110 })
+
+// 43. nearestIndex snaps a pointer angle to the preset it's actually closest
+//     to, including landing exactly on the two boundary presets.
+assert.equal(nearestIndex(-135, 6), 0)
+assert.equal(nearestIndex(135, 6), 5)
+assert.equal(nearestIndex(-30, 6), 2, 'closer to preset 2 than its neighbors')
+
+// 44. clampAngle: a pointer inside the sweep passes through unchanged.
+assert.equal(clampAngle(0), 0)
+
+// 45. clampAngle: a pointer in the 90° gap snaps to whichever edge is
+//     angularly nearer. A naive fold-then-clamp used to send a pointer just
+//     past the START+SWEEP edge all the way to the opposite END edge instead
+//     — the handle would teleport 270° across the dial for a few degrees of
+//     pointer movement right at the seam.
+assert.equal(clampAngle(150), START + SWEEP, '15° past the top edge stays near it')
+assert.equal(clampAngle(170), START + SWEEP, 'still closer to the top edge than the bottom one')
+assert.equal(clampAngle(-160), START, '25° past the bottom edge stays near it')
+
+console.log('schedule.check.mjs: all 45 checks passed ✓')
