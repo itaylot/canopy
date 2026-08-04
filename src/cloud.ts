@@ -4,6 +4,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { useStore, normalizeThemeMode } from './store'
 import { toast, useToasts } from './toast'
+import { useSyncStatus } from './syncStatus'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -66,6 +67,16 @@ export function useCloudSync(user: User | null) {
     if (!user) return
     const ref = doc(db, 'users', user.uid)
     let applyingRemote = false
+    const setStatus = useSyncStatus.getState().set
+
+    // navigator.onLine is a live browser signal, independent of whether a
+    // write happens to be in flight — a genuine "no network" state should
+    // show even between edits, not only appear once something fails to send.
+    const goOffline = () => setStatus('offline')
+    const goOnline = () => setStatus('saved')
+    window.addEventListener('offline', goOffline)
+    window.addEventListener('online', goOnline)
+    if (!navigator.onLine) setStatus('offline')
     // True from the moment a local edit happens until its write is acknowledged.
     // Without this, a snapshot that lands inside the debounce window overwrites
     // the edit the user just made (it reverts on screen), and the queued write
@@ -95,8 +106,14 @@ export function useCloudSync(user: User | null) {
       } else {
         // First sign-in: seed the cloud doc from whatever is in memory.
         void setDoc(ref, snapshotOf(useStore.getState()))
-          .then(reportSyncOk)
-          .catch((e) => reportSyncFailed(e, 'cloud sync (initial seed) failed'))
+          .then(() => {
+            reportSyncOk()
+            setStatus('saved')
+          })
+          .catch((e) => {
+            reportSyncFailed(e, 'cloud sync (initial seed) failed')
+            setStatus(navigator.onLine ? 'error' : 'offline')
+          })
       }
     })
 
@@ -104,13 +121,20 @@ export function useCloudSync(user: User | null) {
     const unsubStore = useStore.subscribe(() => {
       if (applyingRemote) return // don't push a change we just pulled
       dirty = true
+      if (navigator.onLine) setStatus('saving')
       clearTimeout(timer)
       timer = setTimeout(() => {
         // Send the state as of *now*, not as of the edit that queued this timer —
         // later edits inside the window would otherwise be dropped.
         void setDoc(ref, snapshotOf(useStore.getState()), { merge: true })
-          .then(reportSyncOk)
-          .catch((e) => reportSyncFailed(e, 'cloud sync failed'))
+          .then(() => {
+            reportSyncOk()
+            if (navigator.onLine) setStatus('saved')
+          })
+          .catch((e) => {
+            reportSyncFailed(e, 'cloud sync failed')
+            setStatus(navigator.onLine ? 'error' : 'offline')
+          })
           .finally(() => {
             // Only stop ignoring remote snapshots once nothing newer is queued.
             if (!timer) dirty = false
@@ -123,6 +147,8 @@ export function useCloudSync(user: User | null) {
       unsubDoc()
       unsubStore()
       clearTimeout(timer)
+      window.removeEventListener('offline', goOffline)
+      window.removeEventListener('online', goOnline)
     }
   }, [user])
 }

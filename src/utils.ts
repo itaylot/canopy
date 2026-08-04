@@ -94,6 +94,11 @@ export const DURATION_OPTIONS_MIN = [30, 60, 90, 120, 150, 180, 240, 300, 360]
  *  twelve-hour single task is not. */
 export const DAILY_CAP_OPTIONS_MIN = [60, 90, 120, 150, 180, 240, 300, 360, 420, 480, 540, 600, 720]
 
+/** "4 משימות" / "משימה אחת" — the month grid's compact per-day summary. */
+export const taskCountLabel = (n: number) => (n === 1 ? 'משימה אחת' : `${n} משימות`)
+/** "2 מבחנים" / "מבחן אחד" */
+export const examCountLabel = (n: number) => (n === 1 ? 'מבחן אחד' : `${n} מבחנים`)
+
 export function formatDuration(minutes: number): string {
   const h = minutes / 60
   if (h === 0.5) return 'חצי שעה'

@@ -135,6 +135,7 @@ export default function Focus() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             className="absolute inset-x-0 top-0 flex items-center justify-between p-4 sm:p-6"
+            style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
           >
             {/* Collapse leaves focus mode with the clock still running (a resume
                 bar appears on the normal screens); Stop below ends it. */}
@@ -168,12 +169,21 @@ export default function Focus() {
           // Controlled by dragOffset (in the focus store, not component state) so
           // the position survives minimizing and re-expanding within the session
           // — the component unmounts on collapse, and this comes back from outside it.
-          style={{ x: dragOffset.x, y: dragOffset.y }}
+          style={{
+            x: dragOffset.x,
+            y: dragOffset.y,
+            // A plain class (top-14) doesn't know about the notch — on a
+            // top-anchored scene this keeps the timer clear of the taller top
+            // controls row above once its own safe-area padding is added in.
+            ...(scene.anchor.y === 'bottom'
+              ? {}
+              : { top: 'max(3.5rem, calc(env(safe-area-inset-top) + 3rem))' }),
+          }}
           onDragEnd={(_, info) =>
             setDragOffset({ x: dragOffset.x + info.offset.x, y: dragOffset.y + info.offset.y })
           }
           className={`absolute p-5 text-right text-white sm:p-8 ${
-            scene.anchor.y === 'bottom' ? 'bottom-0' : 'top-14'
+            scene.anchor.y === 'bottom' ? 'bottom-0' : ''
           } ${scene.anchor.x === 'right' ? 'right-0' : 'left-0'}`}
         >
           <AnimatePresence>

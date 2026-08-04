@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type TabKey = 'home' | 'plan' | 'schedule' | 'courses' | 'profile'
+export type TabKey = 'home' | 'plan' | 'courses' | 'more'
 
 /**
  * Which tab is open.

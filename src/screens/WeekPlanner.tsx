@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, type PanInfo } from 'motion/react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { AnimatePresence, motion, useDragControls, type PanInfo } from 'motion/react'
 import {
   CaretRight,
   CaretLeft,
@@ -8,6 +8,8 @@ import {
   Tray,
   WarningCircle,
   PushPin,
+  CalendarPlus,
+  PencilSimple,
 } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
 import { buildSchedule, unscheduled, dayLoad, overdue } from '../schedule'
@@ -23,7 +25,7 @@ import {
   dayOfMonth,
   formatHeShort,
 } from '../utils'
-import { Sheet, CourseFilter } from '../ui'
+import { Sheet, CourseFilter, RowMenu, TaskDetailSheet, EditTaskSheet } from '../ui'
 import { useCourseColor } from '../theme'
 import { goTo } from '../nav'
 
@@ -38,13 +40,15 @@ const WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמיש�
  * drag-and-drop, which does not exist on touch devices at all.
  */
 export default function WeekPlanner() {
-  const { tasks, exams, courses, dailyCap, toggleTask, setTaskDay } = useStore()
+  const { tasks, exams, courses, dailyCap, toggleTask, setTaskDay, updateTask } = useStore()
   const today = todayIso()
   const [weekStart, setWeekStart] = useState(startOfWeekIso(today))
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
   const [picking, setPicking] = useState<Task | null>(null)
+  const [viewing, setViewing] = useState<Task | null>(null)
+  const [editing, setEditing] = useState<Task | null>(null)
 
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
   const schedule = useMemo(() => buildSchedule(tasks), [tasks])
@@ -137,9 +141,10 @@ export default function WeekPlanner() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setWeekStart(addDaysIso(weekStart, -7))}
-            className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
+            className="relative rounded-full p-1.5 text-muted hover:bg-primary-soft"
             aria-label="שבוע קודם"
           >
+            <span className="absolute -inset-1.5" />
             <CaretRight size={20} />
           </button>
           <span className="min-w-0 text-center text-sm font-semibold text-ink">
@@ -147,16 +152,18 @@ export default function WeekPlanner() {
           </span>
           <button
             onClick={() => setWeekStart(addDaysIso(weekStart, 7))}
-            className="rounded-full p-1.5 text-muted hover:bg-primary-soft"
+            className="relative rounded-full p-1.5 text-muted hover:bg-primary-soft"
             aria-label="שבוע הבא"
           >
+            <span className="absolute -inset-1.5" />
             <CaretLeft size={20} />
           </button>
         </div>
       </div>
 
       <p className="px-1 text-xs text-muted">
-        גרור משימה מהמאגר ליום, או בחזרה למאגר. אפשר גם להקיש על משימה ולבחור.
+        גרור משימה מהמאגר ליום, או בחזרה למאגר. אפשר גם לפתוח את תפריט הפעולות (⋮) ולבחור &quot;שבץ
+        ליום&quot;.
       </p>
 
       <div className="grid gap-2.5 lg:grid-cols-7 lg:items-start">
@@ -217,6 +224,8 @@ export default function WeekPlanner() {
                       onDragMove={onDragMove}
                       onDrop={onDrop(t)}
                       onPick={() => setPicking(t)}
+                      onView={() => setViewing(t)}
+                      onEdit={() => setEditing(t)}
                       onToggle={() => toggleTask(t.id)}
                     />
                   ))}
@@ -253,6 +262,8 @@ export default function WeekPlanner() {
                 onDragMove={onDragMove}
                 onDrop={onDrop(t)}
                 onPick={() => setPicking(t)}
+                onView={() => setViewing(t)}
+                onEdit={() => setEditing(t)}
                 onToggle={() => toggleTask(t.id)}
               />
             ))}
@@ -302,6 +313,8 @@ export default function WeekPlanner() {
                 onDragMove={onDragMove}
                 onDrop={onDrop}
                 onPick={setPicking}
+                onView={setViewing}
+                onEdit={setEditing}
                 onToggle={toggleTask}
               />
             ))}
@@ -319,6 +332,20 @@ export default function WeekPlanner() {
           setPicking(null)
         }}
       />
+
+      <TaskDetailSheet
+        task={viewing}
+        course={viewing ? courseById.get(viewing.courseId) : undefined}
+        onClose={() => setViewing(null)}
+      />
+      <EditTaskSheet
+        task={editing}
+        onClose={() => setEditing(null)}
+        onSave={(patch) => {
+          if (editing) updateTask(editing.id, patch)
+          setEditing(null)
+        }}
+      />
     </div>
   )
 }
@@ -331,6 +358,8 @@ function CourseGroup({
   onDragMove,
   onDrop,
   onPick,
+  onView,
+  onEdit,
   onToggle,
 }: {
   course: Course
@@ -339,6 +368,8 @@ function CourseGroup({
   onDragMove: (e: unknown, info: PanInfo) => void
   onDrop: (t: Task) => (e: unknown, info: PanInfo) => void
   onPick: (t: Task) => void
+  onView: (t: Task) => void
+  onEdit: (t: Task) => void
   onToggle: (id: string) => void
 }) {
   const courseColor = useCourseColor()
@@ -368,6 +399,8 @@ function CourseGroup({
             onDragMove={onDragMove}
             onDrop={onDrop(t)}
             onPick={() => onPick(t)}
+            onView={() => onView(t)}
+            onEdit={() => onEdit(t)}
             onToggle={() => onToggle(t.id)}
           />
         ))}
@@ -385,6 +418,8 @@ function PlannerChip({
   onDragMove,
   onDrop,
   onPick,
+  onView,
+  onEdit,
   onToggle,
 }: {
   task: Task
@@ -394,7 +429,11 @@ function PlannerChip({
   onDragStart: () => void
   onDragMove: (e: unknown, info: PanInfo) => void
   onDrop: (e: unknown, info: PanInfo) => void
+  /** Opens the day picker — reached only from the ⋮ menu now, never a tap on the card. */
   onPick: () => void
+  /** Tapping the card opens the read-only detail sheet instead. */
+  onView: () => void
+  onEdit: () => void
   onToggle: () => void
 }) {
   const courseColor = useCourseColor()
@@ -404,15 +443,54 @@ function PlannerChip({
     if (!guard.shouldIgnoreClick()) fn()
   }
 
+  // Drag is manually armed (dragListener={false} + dragControls) instead of
+  // starting the instant a pointer moves. A mouse drag still starts immediately
+  // — there's no scroll to conflict with. A touch drag waits out a short hold
+  // first, so a normal vertical swipe to scroll the page (which can start on
+  // top of any chip) is free to become a native scroll instead of a drag; only
+  // a genuine hold arms it. Movement past a small threshold during the hold
+  // cancels it — that's an in-progress scroll, not a long-press.
+  const dragControls = useDragControls()
+  const holdTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const holdOrigin = useRef<{ x: number; y: number } | null>(null)
+  const cancelHold = () => {
+    clearTimeout(holdTimer.current)
+    holdOrigin.current = null
+  }
+  // A held-then-released chip clears its own timer (see onPointerUp/Cancel
+  // below), but a chip that unmounts mid-hold — e.g. a remote sync change
+  // removes this exact task while the timer is still pending — wouldn't.
+  useEffect(() => () => clearTimeout(holdTimer.current), [])
+  const onPointerDown = (e: ReactPointerEvent) => {
+    guard.down()
+    if (e.pointerType === 'mouse') {
+      dragControls.start(e)
+      return
+    }
+    holdOrigin.current = { x: e.clientX, y: e.clientY }
+    holdTimer.current = setTimeout(() => dragControls.start(e), 160)
+  }
+  const onPointerMove = (e: ReactPointerEvent) => {
+    const origin = holdOrigin.current
+    if (!origin) return
+    if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 6) cancelHold()
+  }
+
   return (
     <motion.div
       layout
       drag
+      dragListener={false}
+      dragControls={dragControls}
       dragSnapToOrigin
       dragMomentum={false}
       dragElastic={0.12}
-      onPointerDownCapture={guard.down}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={cancelHold}
+      onPointerCancel={cancelHold}
       onDragStart={() => {
+        cancelHold()
         guard.dragStart()
         onDragStart()
       }}
@@ -422,10 +500,15 @@ function PlannerChip({
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      className="relative flex touch-none items-center gap-1.5 rounded-lg border px-2 py-1.5 text-right shadow-sm"
+      className="relative flex select-none items-center gap-1.5 rounded-lg border px-2 py-1.5 text-right shadow-sm"
       style={{
         backgroundColor: courseColor(course?.color) + '14',
         borderColor: courseColor(course?.color) + '66',
+        // Manual drag arming (see above) skips Motion's own automatic
+        // touch-callout/select suppression, since that only applies when
+        // dragListener is left at its default. Set it explicitly so a held
+        // touch arms a drag instead of iOS's text-selection callout.
+        WebkitTouchCallout: 'none',
       }}
     >
       <button
@@ -443,7 +526,7 @@ function PlannerChip({
           }`}
         />
       </button>
-      <button onClick={tap(onPick)} className="min-w-0 flex-1 cursor-grab text-right active:cursor-grabbing">
+      <button onClick={tap(onView)} className="min-w-0 flex-1 cursor-grab text-right active:cursor-grabbing">
         <span className="block truncate text-[11px] font-semibold leading-tight text-ink">{task.title}</span>
         <span className="block truncate text-[10px] leading-tight text-muted">
           {course ? `${course.name} · ` : ''}
@@ -451,6 +534,16 @@ function PlannerChip({
         </span>
         {note && <span className="block truncate text-[10px] leading-tight text-accent-text">תוכננה ל{note}</span>}
       </button>
+      {/* The only way to open the day picker now — a tap on the card opens the
+          view sheet instead (see onView above). The menu itself only mounts
+          once opened, well after any drag gesture has concluded, so its items
+          don't need the tapGuard wrapper the drag surface above them does. */}
+      <RowMenu
+        items={[
+          { label: 'שבץ ליום', Icon: CalendarPlus, onClick: onPick },
+          { label: 'עריכה', Icon: PencilSimple, onClick: onEdit },
+        ]}
+      />
     </motion.div>
   )
 }

@@ -1,8 +1,8 @@
 /** A drop target: the day it stands for, plus where it sits on the page. */
 export type Zone = { key: string; left: number; top: number; right: number; bottom: number }
 
-/** The pool zone's key — dropping there clears the day and hands the task back
- *  to the auto-scheduler. */
+/** The pool zone's key — dropping there clears the day and sends the task
+ *  back to the unscheduled pool. */
 export const POOL = 'pool'
 
 /**

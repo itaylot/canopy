@@ -32,19 +32,19 @@ Built for students who open their planner forty times a day, usually stressed. E
 - [⬆ Updating](#-updating)
 - [🔒 Privacy & data](#-privacy--data)
 - [🛠️ Engineering challenges solved](#%EF%B8%8F-engineering-challenges-solved)
-- [Advanced: the scheduling algorithm](#advanced-the-scheduling-algorithm)
+- [Advanced: how tasks land on days](#advanced-how-tasks-land-on-days)
 - [📁 Project structure](#-project-structure)
 - [📜 License & credits](#-license--credits)
 
 ## ⭐ Highlights
 
 - 🧗 **Zipline progress scene** — completed tasks become checkpoints on a rope between two trees; a small rider marks where you are right now.
-- 🗓️ **Automatic scheduling** — tasks without a fixed day are spread across the days before each course's exam, capped by a configurable daily study budget.
-- 📌 **Fixed-day tasks** — assign a task to a specific day and it stays there, like a calendar event; missed days roll forward to today instead of piling up in red.
+- 🗓️ **Manual weekly planning** — new tasks wait in a pool; drag one onto a day (or tap it and pick a day), on desktop or mobile. Nothing is ever placed or moved for you.
+- 📌 **Nothing rolls over silently** — a task whose day has passed shows up in a separate "not completed" list instead of quietly moving to today; you decide whether to reschedule it.
 - ☁️ **Cloud sync** — one tap Google sign-in; courses, tasks and exams sync live between phone, tablet and desktop via Firestore.
-- 📅 **Month & week views** — exams appear by name on the month grid; the week view lays out every scheduled task per day.
+- 📅 **Month & week views** — the month grid shows a short task/exam count per day; the week view lays out every scheduled task per day.
 - 🎚️ **Per-course calendar filter** — toggle courses on and off in the schedule, Google Calendar style.
-- ⏱️ **Focus timer** — a 25-minute countdown with a progress ring, right on the home screen.
+- ⏱️ **Focus mode** — an immersive study-with-me scene with a radial minute picker, themed to match the app.
 - 🧮 **Counts, not scores** — "4 of 7 done today", never an invented 57%; completion is always a deliberate tap, never inferred.
 - 🌘 **Full dark mode** — every color is a CSS variable; the whole theme follows the system preference.
 - 🇮🇱 **Hebrew-first, RTL throughout** — dates, weekday grids and relative times ("עוד יומיים") all render natively.
@@ -67,10 +67,10 @@ Built for students who open their planner forty times a day, usually stressed. E
 ## 🚀 How to use
 
 1. Sign in with Google.
-2. In **קורסים** (Courses), add a course, then add its tasks — each with an estimated duration; optionally pin a task to a specific day.
+2. In **קורסים** (Courses), add a course, then add its tasks — each with an estimated duration.
 3. In **לוח זמנים** (Schedule), add each course's exam date.
-4. Open **בית** (Home): today's plan is already there. Canopy spread the unpinned tasks across the days before each exam, respecting your daily budget.
-5. Tap the circle on a task when you finish it — the zipline grows, and tomorrow's plan rebalances automatically.
+4. In **תכנון שבוע** (Plan), drag each task from the pool onto the day you want to do it (or tap the task and pick a day) — this is the only place a task gets a day.
+5. Open **בית** (Home): whatever you scheduled for today is there. Tap the circle on a task when you finish it and the zipline grows.
 
 ## ⬆ Updating
 
@@ -116,22 +116,24 @@ Your data never lives in this folder — it's in your Firebase project — so up
 - *Diagnosis:* the error page is Google's own, which points at OAuth client configuration rather than app code.
 - *Fix:* complete the consent screen, publish it, and add `https://canopy-b9c49.web.app` (+ `/__/auth/handler`) to the authorized lists.
 
-**5. Trusting the scheduler**
-- *Symptom:* none yet — and that's the point. A scheduler that quietly drops a task the night before an exam is the worst possible bug.
-- *Approach:* the algorithm is a pure function (`buildSchedule`) with no stored state — the calendar is always derived, never persisted, so it can't go stale. A runnable self-check ([`schedule.check.mjs`](schedule.check.mjs), `npm run check`) asserts the six behaviors that could actually hurt: cap overflow spills forward, fixed days ignore the cap, nothing lands on or after exam day, done tasks vanish, overdue work resurfaces today.
+**5. Trusting the plan**
+- *Symptom:* none yet — and that's the point. A planner that quietly moves or drops a task you scheduled yourself is the worst possible bug.
+- *Approach:* every pending task is in exactly one of three states — waiting in the pool, scheduled for today or later, or overdue — computed by pure functions (`schedule.ts`) with no stored state, so the calendar is always derived from the tasks themselves and can't go stale. A runnable self-check ([`schedule.check.mjs`](schedule.check.mjs), `npm run check`) asserts the three states never overlap and always account for every pending task, and that nothing is ever silently relocated off the day it was actually given.
 
 </details>
 
-## Advanced: the scheduling algorithm
+## Advanced: how tasks land on days
 
 <details>
-<summary>How tasks land on days</summary>
+<summary>The three pending states</summary>
 
-Every render, [`src/schedule.ts`](src/schedule.ts) rebuilds the whole plan from scratch:
+Every render, [`src/schedule.ts`](src/schedule.ts) rebuilds the whole view from scratch out of the tasks themselves — nothing about *where* a task sits is stored separately from the task:
 
-1. **Fixed tasks** (`dueDate` set) go exactly on their day — no cap applied. A date in the past is pulled up to today so missed work resurfaces instead of disappearing behind you.
-2. **Auto tasks** get a deadline of one buffer day before their course's next exam, then are placed greedily — earliest deadline first, longest task first on ties — filling each day up to the daily budget (default 3h, configurable in the profile) and spilling overflow forward, but never past the deadline.
-3. Because the function is pure, completing a task instantly rebalances every future day with zero sync logic.
+1. **No `dueDate`** → waiting in the week planner's pool, until dragged (or tapped and assigned) onto a day.
+2. **`dueDate` today or later** → scheduled, and shows up on that day in the week/month views and, if it's today, on the home screen.
+3. **`dueDate` in the past, still not done** → overdue. It stays on the day it was given — it is never moved onto today automatically — and surfaces in its own "not completed" list until you either mark it done, drag it to a new day, or send it back to the pool.
+
+The daily study budget (configurable in the profile) is purely informational: a day over the budget is flagged in the week planner, but it never blocks or moves anything.
 
 </details>
 

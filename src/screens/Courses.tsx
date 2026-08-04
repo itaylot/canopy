@@ -245,6 +245,10 @@ function CourseDetail({
                   key={t.id}
                   task={t}
                   onToggle={() => toggleTask(t.id)}
+                  // Already the canonical edit view for this task (no nested
+                  // sheet — see the note on `editingId` above), so a tap on
+                  // the row does the same thing the ⋮ menu's "עריכה" does.
+                  onView={() => startEdit(t.id)}
                   onEdit={() => startEdit(t.id)}
                   onDelete={() => {
                     if (editingId === t.id) reset()

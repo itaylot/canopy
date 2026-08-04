@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
-  Timer,
   Play,
   ArrowDown,
   ArrowUUpLeft,
@@ -10,6 +9,7 @@ import {
   BookOpen,
   CalendarCheck,
   Plus,
+  PencilSimple,
   X,
 } from '@phosphor-icons/react'
 import { useStore, type Course, type Task } from '../store'
@@ -26,17 +26,23 @@ import {
   examLabel,
   monthCells,
   formatHeShort,
+  DURATION_OPTIONS_MIN,
 } from '../utils'
-import { TaskRow, LeafBurst, Card, Checkbox, inputClass } from '../ui'
+import { TaskRow, TaskDetailSheet, EditTaskSheet, LeafBurst, Card, Checkbox, inputClass, Sheet, PrimaryButton } from '../ui'
 import { useFocus, FOCUS_MINUTES, DEFAULT_FOCUS_MINUTES } from '../focus'
 import { CanopyScene } from '../CanopyScene'
 import { FocusDial } from '../FocusDial'
+import { InstallHint } from '../InstallHint'
+import { onboardingStepsDone } from '../onboarding'
+import { useCourseColor } from '../theme'
+import { toast } from '../toast'
 import { auth } from '../firebase'
 import { goTo } from '../nav'
 
 export default function Home() {
-  const { tasks, exams, courses, toggleTask } = useStore()
-  const startFocus = useFocus((s) => s.start)
+  const { tasks, exams, courses, toggleTask, updateTask } = useStore()
+  const [viewing, setViewing] = useState<Task | null>(null)
+  const [editing, setEditing] = useState<Task | null>(null)
   const today = todayIso()
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses])
 
@@ -74,20 +80,38 @@ export default function Home() {
     <div className="space-y-5">
       <LeafBurst show={burst} />
 
-      <header>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-ink lg:text-3xl">
-          {greetingHe()}
-          {firstName ? `, ${firstName}` : ''}
-          <Leaf weight="fill" size={22} className="shrink-0 -scale-x-100 text-primary" />
-        </h1>
-        <p className="mt-0.5 text-sm text-muted">
-          {total === 0 ? 'אין משימות מתוכננות להיום.' : allDone ? 'סיימת את הכול להיום.' : 'בוא נשמור על המומנטום.'}
-        </p>
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-ink lg:text-3xl">
+            {greetingHe()}
+            {firstName ? `, ${firstName}` : ''}
+            <Leaf weight="fill" size={22} className="shrink-0 -scale-x-100 text-primary" />
+          </h1>
+          <p className="mt-0.5 text-sm text-muted">
+            {total === 0 ? 'אין משימות מתוכננות להיום.' : allDone ? 'סיימת את הכול להיום.' : 'בוא נשמור על המומנטום.'}
+          </p>
+        </div>
+        {/* Focus launch and "add task" anchored together as one matched-shape
+            cluster in the header's empty corner — not two unrelated controls
+            that happen to be nearby. Focus used to be its own card taking a
+            full slot in Row 1; it's reachable from here on Home specifically
+            (this is where "add a task" already lives too), always visible
+            without scrolling past today's list first. */}
+        <div className="flex shrink-0 items-stretch gap-2.5">
+          <FocusHeaderBar />
+          <QuickAddTask />
+        </div>
       </header>
+
+      <InstallHint />
+      <OnboardingChecklist />
 
       {/* Row 1. Today's tasks come first in DOM order, so in RTL they sit on
           the right, where reading starts and attention lands. The scene is the
-          reward for doing them, not the thing to look at first. */}
+          reward for doing them, not the thing to look at first. Just the two
+          of them now — focus mode moved up into the header (see
+          FocusHeaderBar), so this row went back to its original 2-column
+          shape on its own, no layout customization feature needed for that. */}
       <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-stretch lg:gap-5 lg:space-y-0">
         <Card className="p-4 lg:h-full">
           {/* Two lists, one card. The overdue tab only appears when something
@@ -116,7 +140,13 @@ export default function Home() {
           </div>
 
           {activeTab === 'overdue' ? (
-            <OverdueList tasks={overdueTasks} courseById={courseById} today={today} />
+            <OverdueList
+              tasks={overdueTasks}
+              courseById={courseById}
+              today={today}
+              onView={setViewing}
+              onEdit={setEditing}
+            />
           ) : (
             <div className="divide-y divide-line/70">
               <AnimatePresence mode="popLayout">
@@ -127,7 +157,8 @@ export default function Home() {
                     task={t}
                     course={courseById.get(t.courseId)}
                     onToggle={() => toggleTask(t.id)}
-                    onFocus={() => startFocus({ taskId: t.id, taskTitle: t.title, minutes: DEFAULT_FOCUS_MINUTES }, Date.now())}
+                    onView={() => setViewing(t)}
+                    onEdit={() => setEditing(t)}
                   />
                 ))}
               </AnimatePresence>
@@ -155,7 +186,15 @@ export default function Home() {
                 <div className="pt-2">
                   <p className="pt-2 text-xs font-medium text-muted">הושלמו היום</p>
                   {doneToday.map((t) => (
-                    <TaskRow key={t.id} flat task={t} course={courseById.get(t.courseId)} onToggle={() => toggleTask(t.id)} />
+                    <TaskRow
+                      key={t.id}
+                      flat
+                      task={t}
+                      course={courseById.get(t.courseId)}
+                      onToggle={() => toggleTask(t.id)}
+                      onView={() => setViewing(t)}
+                      onEdit={() => setEditing(t)}
+                    />
                   ))}
                 </div>
               )}
@@ -163,26 +202,19 @@ export default function Home() {
           )}
         </Card>
 
-        {/* The scene is much shorter than the task list, so the timer sits
-            under it and absorbs the leftover height instead of leaving a hole
-            beside the tasks. */}
-        <div className="space-y-5 lg:flex lg:h-full lg:flex-col lg:space-y-0 lg:gap-5">
-          <Card className="overflow-hidden">
-            {/* One checkpoint per task planned for today — the route is the
-                day, not the whole semester. Both counts come from the same
-                state the list above renders, so it tracks every tick live. */}
-            <CanopyScene done={doneToday.length} remaining={pendingToday.length} />
-            <p className="px-4 py-3 text-center text-sm text-muted">
-              {total === 0
-                ? 'שבץ משימות ליום כדי למתוח את המסלול.'
-                : allDone
-                  ? 'הגעת לקצה המסלול של היום.'
-                  : `${doneToday.length} מתוך ${total} תחנות היום.`}
-            </p>
-          </Card>
-
-          <FocusTimer className="lg:min-h-0 lg:flex-1" />
-        </div>
+        <Card className="overflow-hidden lg:flex lg:h-full lg:flex-col lg:justify-center">
+          {/* One checkpoint per task planned for today — the route is the
+              day, not the whole semester. Both counts come from the same
+              state the list above renders, so it tracks every tick live. */}
+          <CanopyScene done={doneToday.length} remaining={pendingToday.length} />
+          <p className="px-4 py-3 text-center text-sm text-muted">
+            {total === 0
+              ? 'שבץ משימות ליום כדי למתוח את המסלול.'
+              : allDone
+                ? 'הגעת לקצה המסלול של היום.'
+                : `${doneToday.length} מתוך ${total} תחנות היום.`}
+          </p>
+        </Card>
       </div>
 
       <QuickTasks />
@@ -219,6 +251,16 @@ export default function Home() {
 
         <MiniMonth schedule={schedule} today={today} />
       </div>
+
+      <TaskDetailSheet task={viewing} course={viewing ? courseById.get(viewing.courseId) : undefined} onClose={() => setViewing(null)} />
+      <EditTaskSheet
+        task={editing}
+        onClose={() => setEditing(null)}
+        onSave={(patch) => {
+          if (editing) updateTask(editing.id, patch)
+          setEditing(null)
+        }}
+      />
     </div>
   )
 }
@@ -256,10 +298,14 @@ function OverdueList({
   tasks,
   courseById,
   today,
+  onView,
+  onEdit,
 }: {
   tasks: Task[]
   courseById: Map<string, Course>
   today: string
+  onView: (t: Task) => void
+  onEdit: (t: Task) => void
 }) {
   const { toggleTask, setTaskDay } = useStore()
   return (
@@ -276,13 +322,183 @@ function OverdueList({
             course={courseById.get(t.courseId)}
             note={`תוכננה ל${formatHeShort(t.dueDate!)}`}
             onToggle={() => toggleTask(t.id)}
+            onView={() => onView(t)}
             menu={[
               { label: 'העבר להיום', Icon: ArrowDown, onClick: () => setTaskDay(t.id, today) },
               { label: 'החזר למאגר', Icon: ArrowUUpLeft, onClick: () => setTaskDay(t.id, undefined) },
+              { label: 'עריכה', Icon: PencilSimple, onClick: () => onEdit(t) },
             ]}
           />
         ))}
       </AnimatePresence>
+    </div>
+  )
+}
+
+/**
+ * First-run checklist: the four steps between a fresh account and a working
+ * plan (see onboardingStepsDone for what "done" means for each). Nothing here
+ * is stored state or a dismiss flag — it hides once all four are true, and
+ * reappears if one later stops being true (e.g. deleting your only course),
+ * since it's a live reflection of setup, not a one-time "seen it" checklist.
+ */
+function OnboardingChecklist() {
+  const { courses, exams, tasks } = useStore()
+  const [courseDone, examDone, taskDone, scheduledDone] = onboardingStepsDone(courses, exams, tasks)
+  const steps = [
+    { done: courseDone, label: 'צור קורס ראשון', tab: 'courses' as const },
+    { done: examDone, label: 'הוסף מבחן או יעד לימודי', tab: 'plan' as const },
+    { done: taskDone, label: 'הוסף משימות לקורס', tab: 'courses' as const },
+    { done: scheduledDone, label: 'שבץ משימה ליום בתכנון השבוע', tab: 'plan' as const },
+  ]
+  const doneCount = steps.filter((s) => s.done).length
+  if (doneCount === steps.length) return null
+  const next = steps.find((s) => !s.done)!
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="font-bold text-ink">בואו נתחיל</h2>
+        <span className="text-sm text-muted">
+          {doneCount} מתוך {steps.length} הושלמו
+        </span>
+      </div>
+      <ul className="mb-3 space-y-2">
+        {steps.map((s) => (
+          <li key={s.label} className="flex items-center gap-2.5 text-sm">
+            <CheckCircle
+              weight={s.done ? 'fill' : 'regular'}
+              size={18}
+              className={`shrink-0 ${s.done ? 'text-primary' : 'text-muted/50'}`}
+            />
+            <span className={s.done ? 'text-muted line-through' : 'text-ink'}>{s.label}</span>
+          </li>
+        ))}
+      </ul>
+      <button
+        onClick={() => goTo(next.tab)}
+        className="w-full rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-on-primary"
+      >
+        {next.label}
+      </button>
+    </Card>
+  )
+}
+
+/**
+ * Adding a task used to mean leaving Home for the courses tab. This puts the
+ * same action a tap away from the list it's going to land in — the new task
+ * goes straight to the unscheduled pool, exactly like one added from Courses.
+ */
+function QuickAddTask() {
+  const { courses, addTask } = useStore()
+  const courseColor = useCourseColor()
+  const [open, setOpen] = useState(false)
+
+  if (courses.length === 0) return null // nothing yet to attach a task to
+
+  return (
+    <>
+      <motion.button
+        whileTap={{ scale: 0.92 }}
+        onClick={() => setOpen(true)}
+        className="flex h-[50px] shrink-0 items-center gap-1 rounded-2xl bg-primary px-4 text-sm font-semibold text-on-primary shadow-card"
+      >
+        <Plus weight="bold" size={16} /> משימה
+      </motion.button>
+      <Sheet open={open} onClose={() => setOpen(false)} title="משימה חדשה">
+        {open && (
+          <QuickAddTaskForm
+            courses={courses}
+            courseColor={courseColor}
+            onSubmit={(fields) => {
+              addTask(fields)
+              toast(`"${fields.title}" נוספה למאגר.`)
+              setOpen(false)
+            }}
+          />
+        )}
+      </Sheet>
+    </>
+  )
+}
+
+function QuickAddTaskForm({
+  courses,
+  courseColor,
+  onSubmit,
+}: {
+  courses: Course[]
+  courseColor: (stored?: string) => string
+  onSubmit: (fields: { courseId: string; title: string; minutes: number }) => void
+}) {
+  const [courseId, setCourseId] = useState(courses[0].id)
+  const [title, setTitle] = useState('')
+  const [minutes, setMinutes] = useState(60)
+
+  const submit = () => {
+    if (!title.trim()) return
+    onSubmit({ courseId, title: title.trim(), minutes })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="mb-1.5 text-sm font-medium text-muted">קורס</p>
+        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {courses.map((c) => {
+            const on = c.id === courseId
+            return (
+              <button
+                key={c.id}
+                onClick={() => setCourseId(c.id)}
+                aria-pressed={on}
+                className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ring-1 ring-line transition-colors"
+                style={{ backgroundColor: on ? courseColor(c.color) + '1f' : 'transparent' }}
+              >
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: courseColor(c.color) }} />
+                {c.emoji} {c.name}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-1.5 text-sm font-medium text-muted">שם המשימה</p>
+        <input
+          autoFocus
+          className={inputClass}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          placeholder="למשל: לפתור תרגיל 5"
+        />
+      </div>
+
+      <div>
+        <p className="mb-1.5 text-sm font-medium text-muted">כמה זמן?</p>
+        <div className="flex flex-wrap gap-1.5">
+          {DURATION_OPTIONS_MIN.map((m) => {
+            const on = m === minutes
+            return (
+              <button
+                key={m}
+                onClick={() => setMinutes(m)}
+                aria-pressed={on}
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold tabular-nums transition-colors ${
+                  on ? 'bg-primary text-on-primary' : 'bg-primary-soft text-primary'
+                }`}
+              >
+                {formatDuration(m)}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <PrimaryButton onClick={submit}>הוסף משימה</PrimaryButton>
+      <p className="-mt-2 text-center text-xs text-muted">המשימה תיכנס למאגר בטאב &quot;תכנון&quot;, שם תוכל לגרור אותה ליום.</p>
     </div>
   )
 }
@@ -416,8 +632,9 @@ function QuickTasks() {
                 <button
                   onClick={() => removeQuickTask(t.id)}
                   aria-label="מחק משימה"
-                  className="shrink-0 rounded-full p-1 text-muted transition-colors hover:text-accent-text"
+                  className="relative shrink-0 rounded-full p-1 text-muted transition-colors hover:text-accent-text"
                 >
+                  <span className="absolute -inset-2" />
                   <X size={15} />
                 </button>
               </motion.li>
@@ -523,31 +740,71 @@ function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; t
 }
 
 /**
- * Launcher for the immersive focus mode. Pick a length and enter — the running
- * session lives in the focus store (timestamp-based), so this card holds no
- * timer state itself. Replaces the old inline countdown, which couldn't survive
- * leaving the screen.
+ * Focus launch, anchored in the header next to "add task" instead of taking
+ * a full card in Row 1 — the running session still lives in the focus store
+ * (timestamp-based), so this holds no timer state of its own beyond the
+ * chosen length. The watchface thumbnail is the same per-theme illustration
+ * FocusDial uses, just cropped to a wide strip (zoomed background-image, not
+ * a redrawn asset) so it stays recognizable at this size. Tapping it opens
+ * the full dial for precise selection; the ± steps through the same presets
+ * for a quick adjustment without leaving the header.
  */
-function FocusTimer({ className = '' }: { className?: string }) {
+function FocusHeaderBar() {
   const start = useFocus((s) => s.start)
   const theme = useStore((s) => s.theme)
   const [minutes, setMinutes] = useState(DEFAULT_FOCUS_MINUTES)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const idx = FOCUS_MINUTES.indexOf(minutes)
+  const step = (dir: number) => setMinutes(FOCUS_MINUTES[Math.max(0, Math.min(FOCUS_MINUTES.length - 1, idx + dir))])
 
   return (
-    <Card className={`flex flex-col items-center gap-4 p-4 ${className}`}>
-      <h2 className="self-start flex items-center gap-1.5 font-bold text-ink">
-        <Timer size={18} className="text-primary" /> זמן מיקוד
-      </h2>
+    <>
+      <div className="flex h-[50px] shrink-0 items-center gap-2.5 rounded-2xl bg-surface py-1.5 pl-3.5 pr-1.5 shadow-card">
+        <button
+          onClick={() => setPickerOpen(true)}
+          aria-label="פתיחת בורר זמן המיקוד המלא"
+          className="h-full w-16 shrink-0 rounded-xl bg-cover"
+          style={{ backgroundImage: `url(/dial-${theme}.png)`, backgroundSize: '170px 170px', backgroundPosition: 'center 46%' }}
+        />
+        <div className="min-w-0">
+          <div className="text-[10px] text-muted">זמן מיקוד</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold tabular-nums text-ink">{formatDuration(minutes)}</span>
+            <div className="flex gap-0.5">
+              <button
+                onClick={() => step(-1)}
+                disabled={idx <= 0}
+                aria-label="פחות זמן"
+                className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
+              >
+                −
+              </button>
+              <button
+                onClick={() => step(1)}
+                disabled={idx >= FOCUS_MINUTES.length - 1}
+                aria-label="יותר זמן"
+                className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => start({ minutes }, Date.now())}
+          aria-label="כניסה למצב מיקוד"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-on-primary"
+        >
+          <Play weight="fill" size={14} />
+        </motion.button>
+      </div>
 
-      <FocusDial theme={theme} presets={FOCUS_MINUTES} value={minutes} onChange={setMinutes} />
-
-      <motion.button
-        whileTap={{ scale: 0.98 }}
-        onClick={() => start({ minutes }, Date.now())}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-on-primary"
-      >
-        <Play weight="fill" size={16} /> כניסה למצב מיקוד
-      </motion.button>
-    </Card>
+      <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="זמן מיקוד">
+        <div className="flex justify-center pb-2">
+          <FocusDial theme={theme} presets={FOCUS_MINUTES} value={minutes} onChange={setMinutes} />
+        </div>
+      </Sheet>
+    </>
   )
 }

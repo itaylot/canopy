@@ -3,9 +3,9 @@ import { motion } from 'motion/react'
 import { CaretRight, CaretLeft, Plus, PencilSimple, Trash, PushPin } from '@phosphor-icons/react'
 import { useStore, type Course, type Exam, type Task } from '../store'
 import { buildSchedule } from '../schedule'
-import { todayIso, monthLabel, formatHe, examLabel, monthCells } from '../utils'
+import { todayIso, monthLabel, formatHe, examLabel, monthCells, taskCountLabel, examCountLabel } from '../utils'
 import { toast } from '../toast'
-import { Sheet, TaskRow, Field, inputClass, PrimaryButton, RowMenu, CourseFilter } from '../ui'
+import { Sheet, TaskRow, TaskDetailSheet, EditTaskSheet, Field, inputClass, PrimaryButton, RowMenu, CourseFilter } from '../ui'
 
 const WEEKDAYS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']
 
@@ -62,11 +62,13 @@ export default function CalendarScreen() {
       <div className="rounded-2xl bg-surface p-4 shadow-card">
         <div className="mb-3 flex items-center justify-between">
           {/* In RTL, "previous" sits on the right visually */}
-          <button onClick={() => stepMonth(-1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש קודם">
+          <button onClick={() => stepMonth(-1)} className="relative rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש קודם">
+            <span className="absolute -inset-1.5" />
             <CaretRight size={20} />
           </button>
           <span className="font-semibold text-ink">{monthLabel(year, month)}</span>
-          <button onClick={() => stepMonth(1)} className="rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש הבא">
+          <button onClick={() => stepMonth(1)} className="relative rounded-full p-1.5 text-muted hover:bg-primary-soft" aria-label="חודש הבא">
+            <span className="absolute -inset-1.5" />
             <CaretLeft size={20} />
           </button>
         </div>
@@ -83,7 +85,7 @@ export default function CalendarScreen() {
           {cells.map((iso, i) => {
             if (!iso) return <div key={i} />
             const dayNum = Number(iso.slice(-2))
-            const hasTasks = visibleTasksOf(iso).length > 0
+            const taskCount = visibleTasksOf(iso).length
             const dayExams = visibleExamsOf(iso)
             const isToday = iso === today
             return (
@@ -96,26 +98,30 @@ export default function CalendarScreen() {
                     .map((e) => examLabel(e.title, courseById.get(e.courseId)?.name))
                     .join(', ') || undefined
                 }
-                className={`relative flex min-h-14 flex-col items-center gap-0.5 rounded-xl px-0.5 pt-1.5 text-sm transition-colors ${
+                className={`relative flex min-h-16 flex-col items-center gap-0.5 rounded-xl px-0.5 pb-1 pt-1.5 text-sm transition-colors ${
                   isToday ? 'bg-primary font-bold text-on-primary' : 'text-ink hover:bg-primary-soft'
                 }`}
               >
                 <span>{dayNum}</span>
+                {/* Short counts only — never the task/exam names themselves, so a
+                    heavy day never grows the cell or forces a scrollbar. */}
                 {dayExams.length > 0 && (
                   <span
-                    className={`w-full truncate rounded px-0.5 text-[9px] font-medium leading-tight ${
+                    className={`w-full truncate rounded px-0.5 text-[10px] font-medium leading-tight ${
                       isToday ? 'bg-on-primary/25 text-on-primary' : 'bg-accent-soft text-ink'
                     }`}
                   >
-                    {examLabel(dayExams[0].title, courseById.get(dayExams[0].courseId)?.name)}
+                    {examCountLabel(dayExams.length)}
                   </span>
                 )}
-                {hasTasks && (
+                {taskCount > 0 && (
                   <span
-                    className={`mt-auto mb-1 h-1.5 w-1.5 shrink-0 rounded-full ${
-                      isToday ? 'bg-on-primary' : 'bg-primary'
+                    className={`w-full truncate text-[10px] font-medium leading-tight ${
+                      isToday ? 'text-on-primary/90' : 'text-primary'
                     }`}
-                  />
+                  >
+                    {taskCountLabel(taskCount)}
+                  </span>
                 )}
               </motion.button>
             )
@@ -181,6 +187,9 @@ function DaySheet({
   onDeleteExam: (e: Exam) => void
   courseById: Map<string, Course>
 }) {
+  const updateTask = useStore((s) => s.updateTask)
+  const [viewing, setViewing] = useState<Task | null>(null)
+  const [editing, setEditing] = useState<Task | null>(null)
   return (
     <Sheet open={!!iso} onClose={onClose} title={iso ? formatHe(iso) : ''}>
       <div className="space-y-3">
@@ -207,13 +216,30 @@ function DaySheet({
         })}
 
         {tasks.map((t) => (
-          <TaskRow key={t.id} task={t} course={courseById.get(t.courseId)} onToggle={() => onToggle(t.id)} />
+          <TaskRow
+            key={t.id}
+            task={t}
+            course={courseById.get(t.courseId)}
+            onToggle={() => onToggle(t.id)}
+            onView={() => setViewing(t)}
+            onEdit={() => setEditing(t)}
+          />
         ))}
 
         {tasks.length === 0 && exams.length === 0 && (
           <p className="py-6 text-center text-sm text-muted">אין כלום מתוכנן ליום הזה 🌤️</p>
         )}
       </div>
+
+      <TaskDetailSheet task={viewing} course={viewing ? courseById.get(viewing.courseId) : undefined} onClose={() => setViewing(null)} />
+      <EditTaskSheet
+        task={editing}
+        onClose={() => setEditing(null)}
+        onSave={(patch) => {
+          if (editing) updateTask(editing.id, patch)
+          setEditing(null)
+        }}
+      />
     </Sheet>
   )
 }

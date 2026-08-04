@@ -1,10 +1,9 @@
 import { useEffect, type ComponentType } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { House, CalendarBlank, BookOpen, User, Kanban } from '@phosphor-icons/react'
+import { House, BookOpen, DotsThreeCircle, Kanban } from '@phosphor-icons/react'
 import type { User as FirebaseUser } from 'firebase/auth'
 import Home from './screens/Home'
-import WeekPlanner from './screens/WeekPlanner'
-import CalendarScreen from './screens/CalendarScreen'
+import Plan from './screens/Plan'
 import Courses from './screens/Courses'
 import Profile from './screens/Profile'
 import Login from './screens/Login'
@@ -19,13 +18,15 @@ import { useNav, type TabKey } from './nav'
 import { useStore } from './store'
 import { useApplyTheme, useResolvedDark, THEME_META } from './theme'
 
-// `short` is the mobile dock label — five tabs leave little room on a phone.
+// `short` is the mobile dock label. Week/month used to be two separate tabs
+// ("תכנון"/"לו״ז") — Plan now folds both behind one segmented toggle, and
+// profile becomes the general "עוד" landing spot, so four tabs cover what
+// five used to.
 const TABS: { key: TabKey; label: string; short: string; Icon: typeof House; Screen: ComponentType }[] = [
   { key: 'home', label: 'בית', short: 'בית', Icon: House, Screen: Home },
-  { key: 'plan', label: 'תכנון שבוע', short: 'תכנון', Icon: Kanban, Screen: WeekPlanner },
-  { key: 'schedule', label: 'לוח זמנים', short: 'לו״ז', Icon: CalendarBlank, Screen: CalendarScreen },
+  { key: 'plan', label: 'תכנון', short: 'תכנון', Icon: Kanban, Screen: Plan },
   { key: 'courses', label: 'קורסים', short: 'קורסים', Icon: BookOpen, Screen: Courses },
-  { key: 'profile', label: 'פרופיל', short: 'פרופיל', Icon: User, Screen: Profile },
+  { key: 'more', label: 'עוד', short: 'עוד', Icon: DotsThreeCircle, Screen: Profile },
 ] as const
 
 export default function App() {
@@ -108,7 +109,7 @@ function MainApp({ user }: { user: FirebaseUser }) {
 
           {/* signed-in user, inside the menu (frees the whole top strip of the page) */}
           <button
-            onClick={() => setTab('profile')}
+            onClick={() => setTab('more')}
             className="mx-3 mb-3 mt-auto flex items-center gap-2.5 rounded-xl bg-surface/80 px-3 py-3 text-right backdrop-blur-sm transition-colors hover:bg-surface"
           >
             {user.photoURL ? (
@@ -127,8 +128,13 @@ function MainApp({ user }: { user: FirebaseUser }) {
       </aside>
 
       <div className="flex min-h-[100dvh] flex-col lg:py-6">
-        {/* Mobile header */}
-        <header className="flex items-center justify-between px-4 pt-4 lg:hidden">
+        {/* Mobile header. pt uses safe-area-inset-top so it clears the Dynamic
+            Island / status bar in standalone iOS; the 1rem is the floor for
+            browsers that don't report a safe area at all. */}
+        <header
+          className="flex items-center justify-between px-4 lg:hidden"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+        >
           <span className="flex items-center gap-2 text-lg font-bold tracking-wide text-ink">
             <CanopyMark size={26} /> CANOPY
           </span>
@@ -146,7 +152,7 @@ function MainApp({ user }: { user: FirebaseUser }) {
 
       {/* Mobile floating dock */}
       <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:max-w-2xl lg:hidden">
-        <div className="grid grid-cols-5 rounded-2xl bg-surface/95 p-1 shadow-card backdrop-blur-lg">
+        <div className="grid grid-cols-4 rounded-2xl bg-surface/95 p-1 shadow-card backdrop-blur-lg">
           {TABS.map(({ key, short, Icon }) => {
             const on = key === tab
             return (

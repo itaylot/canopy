@@ -8,9 +8,9 @@ export const auth = getAuth(app)
 export const provider = new GoogleAuthProvider()
 
 // Offline cache: data reads/writes work offline and sync when back online.
-// ignoreUndefinedProperties: task.dueDate is `undefined` for auto-scheduled
-// tasks (the common case) — Firestore rejects `undefined` fields outright,
-// which was silently failing every task write that had no explicit day.
+// ignoreUndefinedProperties: task.dueDate is `undefined` for unscheduled
+// tasks waiting in the planner's pool — Firestore rejects `undefined` fields
+// outright, which was silently failing every task write with no day yet.
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache(),
   ignoreUndefinedProperties: true,

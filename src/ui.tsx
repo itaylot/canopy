@@ -1,10 +1,10 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { DotsThree, PencilSimple, Trash, Timer, X } from '@phosphor-icons/react'
+import { DotsThree, PencilSimple, Trash, X } from '@phosphor-icons/react'
 import type { Course, Task } from './store'
 import { useToasts, type Toast as ToastType } from './toast'
 import { useCourseColor } from './theme'
-import { formatDuration } from './utils'
+import { formatDuration, formatHe, formatHeShort, DURATION_OPTIONS_MIN } from './utils'
 
 /* ---------- Brand mark: two trees, a rope, a rider ---------- */
 export function CanopyMark({ size = 28 }: { size?: number }) {
@@ -170,9 +170,9 @@ export function TaskRow({
   task,
   course,
   onToggle,
+  onView,
   onEdit,
   onDelete,
-  onFocus,
   menu,
   note,
   flat = false,
@@ -180,10 +180,11 @@ export function TaskRow({
   task: Task
   course?: Course
   onToggle: () => void
+  /** Tapping the row body opens the read-only detail sheet — see TaskDetailSheet.
+   *  Marking done/undone lives only on the trailing checkbox now. */
+  onView: () => void
   onEdit?: () => void
   onDelete?: () => void
-  /** Starts an immersive focus session for this task. */
-  onFocus?: () => void
   /** Replaces the default edit/delete menu — used by the overdue list, whose
    *  actions are about rescheduling rather than editing. */
   menu?: MenuItem[]
@@ -213,7 +214,7 @@ export function TaskRow({
         {course?.emoji ?? '📘'}
       </span>
 
-      <button onClick={onToggle} className="min-w-0 flex-1 text-right">
+      <button onClick={onView} className="min-w-0 flex-1 text-right">
         <div className={`truncate font-semibold ${task.done ? 'text-muted line-through' : 'text-ink'}`}>
           {task.title}
         </div>
@@ -224,17 +225,6 @@ export function TaskRow({
         {note && <div className="mt-0.5 truncate text-[11px] text-accent-text">{note}</div>}
       </button>
 
-      {onFocus && !task.done && (
-        <button
-          onClick={onFocus}
-          aria-label="מצב מיקוד"
-          title="מצב מיקוד"
-          className="shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-primary-soft hover:text-primary"
-        >
-          <Timer size={18} />
-        </button>
-      )}
-
       {menu ? (
         <RowMenu items={menu} />
       ) : onEdit && onDelete ? (
@@ -244,6 +234,18 @@ export function TaskRow({
             { label: 'מחיקה', Icon: Trash, onClick: onDelete, danger: true },
           ]}
         />
+      ) : onEdit ? (
+        // A single-action ⋮ menu is just a click of indirection around one
+        // button — go straight to the edit icon instead.
+        <button
+          onClick={onEdit}
+          aria-label="עריכה"
+          title="עריכה"
+          className="relative shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-primary-soft hover:text-primary"
+        >
+          <span className="absolute -inset-1.5" />
+          <PencilSimple size={16} />
+        </button>
       ) : (
         onDelete && (
           <button
@@ -261,10 +263,119 @@ export function TaskRow({
         onClick={onToggle}
         aria-label={task.done ? 'בטל סימון' : 'סמן כהושלם'}
         title={task.done ? 'בטל סימון' : 'סמן כהושלם'}
+        className="relative shrink-0"
       >
+        <span className="absolute -inset-2" />
         <Checkbox done={task.done} />
       </motion.button>
     </motion.div>
+  )
+}
+
+/* ---------- Task detail (view) ---------- */
+/**
+ * The read-only view every task card's tap opens, everywhere a task appears.
+ * Purely informational — editing and rescheduling live behind each row's own
+ * ⋮ menu, never here, so there's exactly one meaning for "tap the card."
+ */
+export function TaskDetailSheet({
+  task,
+  course,
+  onClose,
+}: {
+  task: Task | null
+  course?: Course
+  onClose: () => void
+}) {
+  return (
+    <Sheet open={!!task} onClose={onClose} title={task?.title}>
+      {task && (
+        <div className="space-y-2.5">
+          <DetailRow label="קורס" value={course ? `${course.emoji} ${course.name}` : '—'} />
+          <DetailRow label="משך זמן" value={formatDuration(task.minutes)} />
+          <DetailRow
+            label="סטטוס"
+            value={task.done ? `הושלמה${task.completedAt ? ' · ' + formatHeShort(task.completedAt) : ''}` : 'לא הושלמה'}
+          />
+          <DetailRow label="תזמון" value={task.dueDate ? formatHe(task.dueDate) : 'ממתינה לשיבוץ בתכנון השבוע'} />
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-bg px-3.5 py-2.5">
+      <span className="text-sm text-muted">{label}</span>
+      <span className="text-sm font-semibold text-ink">{value}</span>
+    </div>
+  )
+}
+
+/* ---------- Task edit ---------- */
+/**
+ * The ⋮ menu's "עריכה" opens this in place, wherever the task happens to be
+ * shown — Home, the calendar day sheet, the week planner. Editing a task
+ * shouldn't mean leaving the screen you were on to go find it somewhere else;
+ * that's a real cost in a planner meant to feel calm, not a detail to skip.
+ * Only title + duration are editable here (course and day are reassigned via
+ * their own dedicated flows, not folded into this form).
+ */
+export function EditTaskSheet({
+  task,
+  onClose,
+  onSave,
+}: {
+  task: Task | null
+  onClose: () => void
+  onSave: (patch: { title: string; minutes: number }) => void
+}) {
+  const [title, setTitle] = useState('')
+  const [minutes, setMinutes] = useState(60)
+
+  useEffect(() => {
+    if (!task) return
+    setTitle(task.title)
+    setMinutes(task.minutes)
+  }, [task])
+
+  const submit = () => {
+    if (!title.trim()) return
+    onSave({ title: title.trim(), minutes })
+  }
+
+  return (
+    <Sheet open={!!task} onClose={onClose} title="עריכת משימה">
+      <Field label="שם המשימה">
+        <input
+          className={inputClass}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+        />
+      </Field>
+      <Field label="כמה זמן?">
+        <div className="flex flex-wrap gap-1.5">
+          {DURATION_OPTIONS_MIN.map((m) => {
+            const on = m === minutes
+            return (
+              <button
+                key={m}
+                onClick={() => setMinutes(m)}
+                aria-pressed={on}
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold tabular-nums transition-colors ${
+                  on ? 'bg-primary text-on-primary' : 'bg-primary-soft text-primary'
+                }`}
+              >
+                {formatDuration(m)}
+              </button>
+            )
+          })}
+        </div>
+      </Field>
+      <PrimaryButton onClick={submit}>שמור שינויים</PrimaryButton>
+    </Sheet>
   )
 }
 
@@ -318,8 +429,11 @@ export function RowMenu({ items }: { items: MenuItem[] }) {
         aria-label="אפשרויות"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="grid h-8 w-8 place-items-center rounded-full text-muted transition-colors hover:bg-primary-soft hover:text-ink"
+        className="relative grid h-8 w-8 place-items-center rounded-full text-muted transition-colors hover:bg-primary-soft hover:text-ink"
       >
+        {/* Invisible hit-area padding: the visual target stays 32px, but a bare
+            32px button fails the ~44px comfortable-touch-target guideline. */}
+        <span className="absolute -inset-1.5" />
         <DotsThree weight="bold" size={20} />
       </button>
 
@@ -408,8 +522,9 @@ function ToastRow({ toast: t, onDone }: { toast: ToastType; onDone: () => void }
       <button
         onClick={onDone}
         aria-label="סגור"
-        className="shrink-0 rounded-lg p-1 text-white/60 transition-colors hover:text-white"
+        className="relative shrink-0 rounded-lg p-1 text-white/60 transition-colors hover:text-white"
       >
+        <span className="absolute -inset-2" />
         <X size={15} />
       </button>
     </motion.div>

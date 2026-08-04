@@ -94,7 +94,7 @@ type State = {
   removeCourse: (id: string) => void
   addTask: (t: Omit<Task, 'id' | 'done' | 'completedAt'>) => void
   updateTask: (id: string, patch: Partial<Task>) => void
-  /** Pin a task to a day, or pass undefined to hand it back to auto-scheduling. */
+  /** Pin a task to a day, or pass undefined to send it back to the unscheduled pool. */
   setTaskDay: (id: string, day: string | undefined) => void
   toggleTask: (id: string) => void
   removeTask: (id: string) => void

@@ -8,12 +8,20 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { buildSchedule, unscheduled, scheduled, overdue, dayLoad } from './src/schedule.ts'
-import { addDaysIso, examLabel } from './src/utils.ts'
+import { addDaysIso, examLabel, taskCountLabel, examCountLabel } from './src/utils.ts'
 import { zoneAt, tapGuard } from './src/planner.ts'
 import { buildIcs } from './src/ics.ts'
 import { isDark, normalizeThemeMode, themedCourseColor, COURSE_PALETTES } from './src/store.ts'
 import { msLeft, isPaused, isDone } from './src/focus.ts'
 import { angleFor, pt, nearestIndex, clampAngle, START, SWEEP } from './src/dialGeometry.ts'
+import {
+  shouldShowInstallHint,
+  INSTALL_HINT_SNOOZE_MS,
+  isIOSUserAgent,
+  classifyIOSBrowser,
+} from './src/installHintLogic.ts'
+import { useNav, goTo } from './src/nav.ts'
+import { onboardingStepsDone } from './src/onboarding.ts'
 
 const T = '2026-07-19'
 const task = (id, courseId, minutes, extra = {}) => ({ id, courseId, title: id, minutes, done: false, ...extra })
@@ -478,4 +486,78 @@ assert.equal(clampAngle(150), START + SWEEP, '15° past the top edge stays near 
 assert.equal(clampAngle(170), START + SWEEP, 'still closer to the top edge than the bottom one')
 assert.equal(clampAngle(-160), START, '25° past the bottom edge stays near it')
 
-console.log('schedule.check.mjs: all 45 checks passed ✓')
+// 46. Month-grid singular/plural count labels.
+assert.equal(taskCountLabel(1), 'משימה אחת')
+assert.equal(taskCountLabel(4), '4 משימות')
+assert.equal(examCountLabel(1), 'מבחן אחד')
+assert.equal(examCountLabel(2), '2 מבחנים')
+
+// 47. Install-hint snooze: never dismissed shows immediately; a fresh
+//     dismissal stays quiet; one past the snooze window shows again.
+const hintNow = Date.parse(T)
+assert.equal(shouldShowInstallHint(null, hintNow), true, 'never dismissed — show it')
+assert.equal(shouldShowInstallHint(hintNow, hintNow), false, 'just dismissed — stay quiet')
+assert.equal(
+  shouldShowInstallHint(hintNow - INSTALL_HINT_SNOOZE_MS - 1, hintNow),
+  true,
+  'snooze window elapsed — show it again',
+)
+assert.equal(
+  shouldShowInstallHint(hintNow - INSTALL_HINT_SNOOZE_MS + 1, hintNow),
+  false,
+  'just inside the snooze window — still quiet',
+)
+
+// 48. goTo switches the active tab.
+assert.equal(useNav.getState().tab, 'home', 'starts on home')
+goTo('plan')
+assert.equal(useNav.getState().tab, 'plan')
+
+// 49. iOS / browser detection against real-world UA strings. classifyIOSBrowser
+//     is only meaningful once isIOSUserAgent (or the live isIOS()) is already
+//     true — Android is asserted at that gate, not through classify.
+const UA_IPHONE_SAFARI =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
+const UA_IPAD_SAFARI =
+  'Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
+const UA_DESKTOP_SAFARI =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15'
+const UA_ANDROID_CHROME =
+  'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36'
+const UA_INSTAGRAM_IN_APP =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 300.0.0.0.00'
+const UA_CHROME_IOS =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.0.0 Mobile/15E148 Safari/604.1'
+
+assert.equal(isIOSUserAgent(UA_IPHONE_SAFARI), true, 'iPhone Safari')
+assert.equal(isIOSUserAgent(UA_IPAD_SAFARI), true, 'iPadOS Safari (classic UA)')
+assert.equal(isIOSUserAgent(UA_DESKTOP_SAFARI), false, 'desktop Safari is not iOS')
+assert.equal(isIOSUserAgent(UA_ANDROID_CHROME), false, 'Android is not iOS')
+
+assert.equal(classifyIOSBrowser(UA_IPHONE_SAFARI), 'safari')
+assert.equal(classifyIOSBrowser(UA_IPAD_SAFARI), 'safari')
+assert.equal(classifyIOSBrowser(UA_INSTAGRAM_IN_APP), 'in-app', 'a common social-app in-app browser')
+assert.equal(classifyIOSBrowser(UA_CHROME_IOS), 'other', 'a real but non-Safari iOS browser')
+
+// 50. Onboarding checklist: appears/disappears strictly from current data, and
+//     — since it's a live reflection, not a one-time flag — reappears the
+//     moment a completed step becomes undone again (e.g. the last course of
+//     its kind gets deleted).
+assert.deepEqual(onboardingStepsDone([], [], []), [false, false, false, false], 'brand new account')
+const oneCourse = [{ id: 'c1', name: 'Course', emoji: '📘', color: '#000' }]
+const oneExam = [{ id: 'e1', courseId: 'c1', title: '', date: '2026-08-01' }]
+const unscheduledTask = [task('t1', 'c1', 30)]
+const scheduledTask = [task('t2', 'c1', 30, { dueDate: '2026-08-01' })]
+assert.deepEqual(onboardingStepsDone(oneCourse, [], []), [true, false, false, false])
+assert.deepEqual(onboardingStepsDone(oneCourse, oneExam, unscheduledTask), [true, true, true, false])
+assert.deepEqual(onboardingStepsDone(oneCourse, oneExam, scheduledTask), [true, true, true, true], 'all four done')
+// The "undo" case: same data as fully-done, minus the one course — the course
+// step (and only that one) flips back to not-done, exactly as if a user who
+// had everything set up deleted their one course.
+assert.deepEqual(
+  onboardingStepsDone([], oneExam, scheduledTask),
+  [false, true, true, true],
+  'deleting the only course un-does step 1, even though steps 2-4 still hold',
+)
+
+console.log('schedule.check.mjs: all 50 checks passed ✓')

@@ -1,13 +1,33 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { SignOut, CloudCheck, Sun, Moon, Sparkle, DownloadSimple } from '@phosphor-icons/react'
+import {
+  SignOut,
+  CloudCheck,
+  CloudArrowUp,
+  CloudSlash,
+  CloudWarning,
+  Sun,
+  Moon,
+  Sparkle,
+  DownloadSimple,
+  Share,
+} from '@phosphor-icons/react'
 import { useStore, type ThemeKey, type ModeKey } from '../store'
 import { THEME_META, THEME_KEYS } from '../theme'
 import { auth, logOut } from '../firebase'
 import { formatDuration, todayIso, DAILY_CAP_OPTIONS_MIN } from '../utils'
 import { buildSchedule } from '../schedule'
 import { buildIcs, downloadIcs } from '../ics'
-import { Card, Field, inputClass } from '../ui'
+import { useSyncStatus } from '../syncStatus'
+import { InstallInstructions } from '../InstallHint'
+import { Card, Field, inputClass, Sheet } from '../ui'
+
+const SYNC_META = {
+  saved: { Icon: CloudCheck, text: 'הנתונים נשמרים בענן ומסתנכרנים בין כל המכשירים.' },
+  saving: { Icon: CloudArrowUp, text: 'שומר בענן…' },
+  offline: { Icon: CloudSlash, text: 'עובד ללא חיבור. השינויים יישמרו כשהחיבור יחזור.' },
+  error: { Icon: CloudWarning, text: 'השינויים לא נשמרו בענן. בדוק את החיבור.' },
+} as const
 
 const MODE_CHOICES: { key: ModeKey; label: string; Icon: typeof Sun }[] = [
   { key: 'auto', label: 'אוטומטי', Icon: Sparkle },
@@ -26,6 +46,9 @@ const THEME_SWATCH: Record<ThemeKey, React.CSSProperties> = {
 export default function Profile() {
   const { tasks, courses, exams, dailyCap, setDailyCap, theme, setTheme, mode, setMode } = useStore()
   const user = auth.currentUser
+  const syncStatus = useSyncStatus((s) => s.status)
+  const { Icon: SyncIcon, text: syncText } = SYNC_META[syncStatus]
+  const [installOpen, setInstallOpen] = useState(false)
 
   const exportCalendar = () => {
     const today = todayIso()
@@ -148,10 +171,30 @@ export default function Profile() {
         </button>
       </Card>
 
-      <Card className="flex items-center gap-2.5 p-4 text-sm text-ink">
-        <CloudCheck weight="fill" size={20} className="shrink-0 text-primary" />
-        הנתונים נשמרים בענן ומסתנכרנים בין כל המכשירים.
+      <Card
+        className={`flex items-center gap-2.5 p-4 text-sm ${
+          syncStatus === 'error' ? 'text-accent-text' : 'text-ink'
+        }`}
+      >
+        <SyncIcon
+          weight="fill"
+          size={20}
+          className={`shrink-0 ${syncStatus === 'error' ? 'text-accent-text' : 'text-primary'}`}
+        />
+        {syncText}
       </Card>
+
+      <button
+        onClick={() => setInstallOpen(true)}
+        className="flex w-full items-center gap-2.5 rounded-2xl bg-surface p-4 text-sm font-semibold text-ink shadow-card transition-colors hover:bg-primary-soft"
+      >
+        <Share size={18} className="shrink-0 text-primary" />
+        איך מתקינים את Canopy באייפון
+      </button>
+
+      <Sheet open={installOpen} onClose={() => setInstallOpen(false)} title="התקנה למסך הבית">
+        <InstallInstructions />
+      </Sheet>
 
       <motion.button
         whileTap={{ scale: 0.98 }}
