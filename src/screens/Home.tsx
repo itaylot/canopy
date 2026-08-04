@@ -792,15 +792,18 @@ function FocusHeaderBar() {
         <button
           onClick={() => setPickerOpen(true)}
           aria-label="פתיחת בורר זמן המיקוד המלא"
-          className="relative w-24 shrink-0 bg-primary-soft"
+          className="w-24 shrink-0 overflow-hidden bg-primary-soft"
         >
-          {/* A real <img> cropped with object-fit, not a CSS background-image
-              guess at size/position — that silently rendered blank in
-              production. */}
+          {/* The watchface art is a ring of tree canopies around a large
+              empty cream center (that's where FocusDial overlays the
+              minutes). A crop centered on the image mostly showed that empty
+              middle. object-position aims low instead, at the trunks/rope —
+              the densest, most "canopy" part of the whole illustration. */}
           <img
             src={`/dial-${theme}.png`}
             alt=""
-            className="absolute left-1/2 top-1/2 h-[145px] w-[145px] -translate-x-1/2 -translate-y-1/2 object-cover"
+            className="h-full w-full object-cover"
+            style={{ objectPosition: '50% 88%' }}
           />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
