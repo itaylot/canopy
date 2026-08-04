@@ -752,6 +752,21 @@ function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; t
 const QUICK_STEP_MIN = 15
 const QUICK_STEP_MAX_MIN = 180
 
+/** formatDuration is built around the app's existing 30-minute-multiple
+ *  presets (half hour, hour and a half, ...) — quarter-hour values like 45 or
+ *  75 fall through its fallback to a raw decimal ("0.8 שעות"), which nobody
+ *  reads as a duration. This covers any whole number of minutes in plain
+ *  Hebrew instead, for this one quarter-hour-granularity control. */
+function formatFocusMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} דקות`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  const hoursWord = hours === 1 ? 'שעה' : hours === 2 ? 'שעתיים' : `${hours} שעות`
+  if (rest === 0) return hoursWord
+  if (rest === 30) return `${hoursWord} וחצי`
+  return `${hoursWord} ו-${rest} דקות`
+}
+
 function FocusHeaderBar() {
   const start = useFocus((s) => s.start)
   const theme = useStore((s) => s.theme)
@@ -769,54 +784,59 @@ function FocusHeaderBar() {
 
   return (
     <>
-      <div className="flex h-[50px] shrink-0 items-center gap-2.5 rounded-2xl bg-surface py-1.5 pl-3.5 pr-1.5 shadow-card">
+      {/* items-stretch (not items-center) + overflow-hidden on the rounded
+          container itself is what makes the watchface a real full-bleed
+          edge, clipped by the container's own corner radius — no separate
+          rounding or fixed height math on the image needed. */}
+      <div className="flex h-[50px] shrink-0 items-stretch overflow-hidden rounded-2xl bg-surface shadow-card">
         <button
           onClick={() => setPickerOpen(true)}
           aria-label="פתיחת בורר זמן המיקוד המלא"
-          className="relative h-[38px] w-16 shrink-0 overflow-hidden rounded-xl bg-primary-soft"
+          className="relative w-24 shrink-0 bg-primary-soft"
         >
           {/* A real <img> cropped with object-fit, not a CSS background-image
               guess at size/position — that silently rendered blank in
-              production. Zoomed + centered so the crop still reads as "a
-              clock" instead of the whole small illustration squashed flat. */}
+              production. */}
           <img
             src={`/dial-${theme}.png`}
             alt=""
-            className="absolute left-1/2 top-1/2 h-[130px] w-[130px] -translate-x-1/2 -translate-y-1/2 object-cover"
+            className="absolute left-1/2 top-1/2 h-[145px] w-[145px] -translate-x-1/2 -translate-y-1/2 object-cover"
           />
         </button>
-        <div className="min-w-0">
-          <div className="text-[10px] text-muted">זמן מיקוד</div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold tabular-nums text-ink">{formatDuration(minutes)}</span>
-            <div className="flex gap-0.5">
-              <button
-                onClick={() => step(-1)}
-                disabled={minutes <= QUICK_STEP_MIN}
-                aria-label="פחות זמן"
-                className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
-              >
-                −
-              </button>
-              <button
-                onClick={() => step(1)}
-                disabled={minutes >= QUICK_STEP_MAX_MIN}
-                aria-label="יותר זמן"
-                className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
-              >
-                +
-              </button>
+        <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
+          <div className="min-w-0">
+            <div className="text-[10px] text-muted">זמן מיקוד</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-ink">{formatFocusMinutes(minutes)}</span>
+              <div className="flex gap-0.5">
+                <button
+                  onClick={() => step(-1)}
+                  disabled={minutes <= QUICK_STEP_MIN}
+                  aria-label="פחות זמן"
+                  className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
+                >
+                  −
+                </button>
+                <button
+                  onClick={() => step(1)}
+                  disabled={minutes >= QUICK_STEP_MAX_MIN}
+                  aria-label="יותר זמן"
+                  className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => start({ minutes }, Date.now())}
+            aria-label="כניסה למצב מיקוד"
+            className="mr-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-on-primary"
+          >
+            <Play weight="fill" size={14} />
+          </motion.button>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={() => start({ minutes }, Date.now())}
-          aria-label="כניסה למצב מיקוד"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-on-primary"
-        >
-          <Play weight="fill" size={14} />
-        </motion.button>
       </div>
 
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="זמן מיקוד">
