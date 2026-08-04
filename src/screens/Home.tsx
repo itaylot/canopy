@@ -749,13 +749,23 @@ function MiniMonth({ schedule, today }: { schedule: Record<string, unknown[]>; t
  * the full dial for precise selection; the ± steps through the same presets
  * for a quick adjustment without leaving the header.
  */
+const QUICK_STEP_MIN = 15
+const QUICK_STEP_MAX_MIN = 180
+
 function FocusHeaderBar() {
   const start = useFocus((s) => s.start)
   const theme = useStore((s) => s.theme)
   const [minutes, setMinutes] = useState(DEFAULT_FOCUS_MINUTES)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const idx = FOCUS_MINUTES.indexOf(minutes)
-  const step = (dir: number) => setMinutes(FOCUS_MINUTES[Math.max(0, Math.min(FOCUS_MINUTES.length - 1, idx + dir))])
+  // Quarter-hour jumps, snapped to the nearest quarter-hour mark in the
+  // pressed direction — not a step through FOCUS_MINUTES's dial presets,
+  // which are deliberately uneven (15/25/40/50/60/90) for that component and
+  // would make this quick stepper jump by irregular amounts.
+  const step = (dir: number) =>
+    setMinutes((m) => {
+      const next = dir > 0 ? Math.floor(m / QUICK_STEP_MIN) * QUICK_STEP_MIN + QUICK_STEP_MIN : Math.ceil(m / QUICK_STEP_MIN) * QUICK_STEP_MIN - QUICK_STEP_MIN
+      return Math.max(QUICK_STEP_MIN, Math.min(QUICK_STEP_MAX_MIN, next))
+    })
 
   return (
     <>
@@ -763,9 +773,18 @@ function FocusHeaderBar() {
         <button
           onClick={() => setPickerOpen(true)}
           aria-label="פתיחת בורר זמן המיקוד המלא"
-          className="h-full w-16 shrink-0 rounded-xl bg-cover"
-          style={{ backgroundImage: `url(/dial-${theme}.png)`, backgroundSize: '170px 170px', backgroundPosition: 'center 46%' }}
-        />
+          className="relative h-[38px] w-16 shrink-0 overflow-hidden rounded-xl bg-primary-soft"
+        >
+          {/* A real <img> cropped with object-fit, not a CSS background-image
+              guess at size/position — that silently rendered blank in
+              production. Zoomed + centered so the crop still reads as "a
+              clock" instead of the whole small illustration squashed flat. */}
+          <img
+            src={`/dial-${theme}.png`}
+            alt=""
+            className="absolute left-1/2 top-1/2 h-[130px] w-[130px] -translate-x-1/2 -translate-y-1/2 object-cover"
+          />
+        </button>
         <div className="min-w-0">
           <div className="text-[10px] text-muted">זמן מיקוד</div>
           <div className="flex items-center gap-1.5">
@@ -773,7 +792,7 @@ function FocusHeaderBar() {
             <div className="flex gap-0.5">
               <button
                 onClick={() => step(-1)}
-                disabled={idx <= 0}
+                disabled={minutes <= QUICK_STEP_MIN}
                 aria-label="פחות זמן"
                 className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
               >
@@ -781,7 +800,7 @@ function FocusHeaderBar() {
               </button>
               <button
                 onClick={() => step(1)}
-                disabled={idx >= FOCUS_MINUTES.length - 1}
+                disabled={minutes >= QUICK_STEP_MAX_MIN}
                 aria-label="יותר זמן"
                 className="grid h-[18px] w-[18px] place-items-center rounded-full bg-primary-soft text-xs font-bold leading-none text-primary disabled:opacity-30"
               >
